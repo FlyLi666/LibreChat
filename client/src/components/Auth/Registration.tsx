@@ -73,7 +73,7 @@ const Registration: React.FC = () => {
           autoComplete={id}
           aria-label={localize(label)}
           {...register(
-            id as 'name' | 'email' | 'username' | 'password' | 'confirm_password',
+            id as 'name' | 'email' | 'username' | 'password' | 'confirm_password' | 'inviteCode',
             validation,
           )}
           aria-invalid={!!errors[id]}
@@ -177,6 +177,20 @@ const Registration: React.FC = () => {
             {renderInput('confirm_password', 'com_auth_password_confirm', 'password', {
               validate: (value: string) =>
                 value === password || localize('com_auth_password_not_match'),
+            })}
+
+            {renderInput('inviteCode', 'com_auth_invite_code', 'text', {
+              required: localize('com_auth_invite_code_required'),
+              minLength: {
+                value: 4,
+                message: localize('com_auth_invite_code_invalid'),
+              },
+              maxLength: {
+                value: 64,
+                message: localize('com_auth_invite_code_invalid'),
+              },
+              setValueAs: (value: string) =>
+                typeof value === 'string' ? value.trim().toUpperCase() : value,
             })}
 
             {startupConfig?.turnstile?.siteKey && (

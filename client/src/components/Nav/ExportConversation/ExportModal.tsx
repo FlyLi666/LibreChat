@@ -110,6 +110,15 @@ export default function ExportModal({
                   className="z-50"
                   portal={false}
                 />
+                {type === 'screenshot' ? (
+                  <p
+                    className="text-xs text-text-secondary"
+                    role="note"
+                    data-testid="export-png-hint"
+                  >
+                    {localize('com_nav_export_png_hint')}
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="grid w-full gap-6 sm:grid-cols-2">

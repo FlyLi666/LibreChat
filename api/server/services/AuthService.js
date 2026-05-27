@@ -38,6 +38,11 @@ const {
 const { registerSchema } = require('~/strategies/validators');
 const { getAppConfig } = require('~/server/services/Config');
 const { sendEmail } = require('~/server/utils');
+const {
+  provisionShadowAccount,
+  rollbackShadowAccount,
+} = require('~/server/services/hezi/HeziProvisioning');
+const { consumeInviteCode } = require('~/models');
 
 const domains = {
   client: process.env.DOMAIN_CLIENT,
@@ -253,6 +258,30 @@ const registerUser = async (user, additionalData = {}) => {
 
     const newUser = await createUser(newUserData, appConfig.balance, disableTTL, true);
     newUserId = newUser._id;
+
+    // === HeZi: provision NewAPI shadow account + consume invite code ===
+    // Only runs when invite-code feature is on AND middleware attached one.
+    const heziInvite = additionalData?.heziInviteCode;
+    if (isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE) && heziInvite) {
+      try {
+        await provisionShadowAccount({
+          user: newUser,
+          quotaCode: heziInvite.quotaCode,
+        });
+        // Atomic consume — succeeds for exactly one concurrent caller.
+        const consumed = await consumeInviteCode(heziInvite.code, newUser._id);
+        if (!consumed) {
+          // Race lost (someone else used the same code first). Roll back.
+          throw new Error('INVITE_CODE_RACE_LOST');
+        }
+      } catch (provisionErr) {
+        logger.error('[registerUser] HeZi provisioning failed, rolling back', provisionErr);
+        await rollbackShadowAccount(newUserId);
+        throw provisionErr;
+      }
+    }
+    // === End HeZi ===
+
     if (emailEnabled && !newUser.emailVerified) {
       await sendVerificationEmail({
         _id: newUserId,

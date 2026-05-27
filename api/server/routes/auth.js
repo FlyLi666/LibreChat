@@ -68,6 +68,7 @@ router.post(
   middleware.registerLimiter,
   middleware.checkBan,
   middleware.checkInviteUser,
+  middleware.checkInviteCode,
   middleware.validateRegistration,
   registrationController,
 );

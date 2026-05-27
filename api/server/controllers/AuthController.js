@@ -33,7 +33,11 @@ const OPENID_REUSE_MAX_SESSION_AGE_MS = 15 * 60 * 1000;
 
 const registrationController = async (req, res) => {
   try {
-    const response = await registerUser(req.body);
+    const additionalData = {};
+    if (req.heziInviteCode) {
+      additionalData.heziInviteCode = req.heziInviteCode;
+    }
+    const response = await registerUser(req.body, additionalData);
     const { status, message } = response;
     res.status(status).send({ message });
   } catch (err) {

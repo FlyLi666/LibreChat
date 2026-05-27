@@ -311,27 +311,42 @@ const useNewConvo = (index = 0) => {
       });
 
       if (conversation.conversationId === Constants.NEW_CONVO && !modelsData) {
-        const filesToDelete = Array.from(files.values())
-          .filter(
-            (file) =>
-              file.filepath != null &&
-              file.filepath !== '' &&
-              file.source &&
-              !(file.embedded ?? false) &&
-              file.temp_file_id,
-          )
-          .map((file) => ({
-            file_id: file.file_id,
-            embedded: !!(file.embedded ?? false),
-            filepath: file.filepath as string,
-            source: file.source as FileSources, // Ensure that the source is of type FileSources
-          }));
+        // HeZi: when the user just switches model/spec on an in-progress new chat,
+        // keep the staged uploads and pending FILES_TO_DELETE intact. Only wipe
+        // when the caller explicitly starts a fresh new chat (no preset, no
+        // model/endpoint/spec hint in the template). Without this guard, picking
+        // a different model erases the user's typed message + attached files.
+        const isModelSwitchOnly =
+          _preset != null ||
+          (_template != null &&
+            (_template.endpoint != null ||
+              _template.model != null ||
+              _template.spec != null ||
+              _template.endpointType != null));
 
-        setFiles(new Map());
-        localStorage.setItem(LocalStorageKeys.FILES_TO_DELETE, JSON.stringify({}));
+        if (!isModelSwitchOnly) {
+          const filesToDelete = Array.from(files.values())
+            .filter(
+              (file) =>
+                file.filepath != null &&
+                file.filepath !== '' &&
+                file.source &&
+                !(file.embedded ?? false) &&
+                file.temp_file_id,
+            )
+            .map((file) => ({
+              file_id: file.file_id,
+              embedded: !!(file.embedded ?? false),
+              filepath: file.filepath as string,
+              source: file.source as FileSources, // Ensure that the source is of type FileSources
+            }));
 
-        if (!saveDrafts && filesToDelete.length > 0) {
-          mutateAsync({ files: filesToDelete });
+          setFiles(new Map());
+          localStorage.setItem(LocalStorageKeys.FILES_TO_DELETE, JSON.stringify({}));
+
+          if (!saveDrafts && filesToDelete.length > 0) {
+            mutateAsync({ files: filesToDelete });
+          }
         }
       }
 

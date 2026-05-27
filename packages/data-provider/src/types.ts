@@ -428,6 +428,8 @@ export type TRegisterUser = {
   password: string;
   confirm_password?: string;
   token?: string;
+  /** HeZi invite code (optional; required only when HEZI_REQUIRE_INVITE_CODE=true on the server). */
+  inviteCode?: string;
 };
 
 export type TLoginUser = {

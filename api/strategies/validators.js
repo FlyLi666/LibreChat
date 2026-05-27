@@ -64,6 +64,18 @@ const registerSchema = z
       .refine((value) => value.trim().length > 0, {
         message: 'Password cannot be only spaces',
       }),
+    /**
+     * HeZi: optional invite code at the schema level so that validateRegistration
+     * still accepts the body even when invite-code feature is off. Real enforcement
+     * lives in `checkInviteCode` middleware (HeZi only) when HEZI_REQUIRE_INVITE_CODE=1.
+     */
+    inviteCode: z
+      .string()
+      .trim()
+      .min(4)
+      .max(64)
+      .optional()
+      .nullable(),
   })
   .superRefine(({ confirm_password, password }, ctx) => {
     if (confirm_password !== password) {
