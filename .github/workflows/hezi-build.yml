@@ -1,0 +1,76 @@
+name: HeZi LibreAI Image Build
+
+on:
+  push:
+    branches:
+      - hezi-main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/workflows/!(hezi-build.yml)'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          TAG="hezi-${SHORT_SHA}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "build_date=${BUILD_DATE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare .env for build
+        run: cp .env.example .env
+
+      - name: Build and push HeZi image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.multi
+          target: api-build
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/flyli666/hezi-libreai:latest
+            ghcr.io/flyli666/hezi-libreai:${{ steps.meta.outputs.tag }}
+          build-args: |
+            BUILD_COMMIT=${{ github.sha }}
+            BUILD_BRANCH=hezi-main
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## HeZi build complete"
+            echo "- tag: \`${{ steps.meta.outputs.tag }}\`"
+            echo "- image: \`ghcr.io/flyli666/hezi-libreai:${{ steps.meta.outputs.tag }}\`"
+            echo "- also tagged: \`ghcr.io/flyli666/hezi-libreai:latest\`"
+            echo "- commit: \`${{ github.sha }}\`"
+            echo "- build_date: \`${{ steps.meta.outputs.build_date }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
