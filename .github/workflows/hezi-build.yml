@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - hezi-main
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/workflows/!(hezi-build.yml)'
   workflow_dispatch:
 
 permissions:
