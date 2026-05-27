@@ -241,6 +241,11 @@ const registerUser = async (user, additionalData = {}) => {
     //determine if this is the first registered user (not counting anonymous_user)
     const isFirstRegisteredUser = (await countUsers()) === 0;
 
+    // HeZi: pull invite-code instructions out of additionalData before
+    // spreading the rest onto the new user doc. The invite code itself is a
+    // provisioning hint, not a user field, and should not be persisted.
+    const { heziInviteCode: heziInvite, ...userMergeData } = additionalData ?? {};
+
     const salt = bcrypt.genSaltSync(10);
     const newUserData = {
       provider: provider ?? 'local',
@@ -250,7 +255,7 @@ const registerUser = async (user, additionalData = {}) => {
       avatar: null,
       role: isFirstRegisteredUser ? SystemRoles.ADMIN : SystemRoles.USER,
       password: bcrypt.hashSync(password, salt),
-      ...additionalData,
+      ...userMergeData,
     };
 
     const emailEnabled = checkEmailConfig();
@@ -261,7 +266,7 @@ const registerUser = async (user, additionalData = {}) => {
 
     // === HeZi: provision NewAPI shadow account + consume invite code ===
     // Only runs when invite-code feature is on AND middleware attached one.
-    const heziInvite = additionalData?.heziInviteCode;
+    // (heziInvite was destructured out of additionalData above.)
     if (isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE) && heziInvite) {
       try {
         await provisionShadowAccount({
