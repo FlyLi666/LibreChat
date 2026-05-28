@@ -188,6 +188,55 @@ describe('image generation routes', () => {
     await flushBackgroundJobs();
   });
 
+  it('keeps reference image URLs on the created batch and background generation request', async () => {
+    mockDb.createGenerationTopic.mockResolvedValue({
+      _id: 'topic-1',
+      title: '保留参考图构图',
+    });
+    mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
+      batch: {
+        _id: 'batch-1',
+        prompt: '保留参考图构图',
+        params: { imageUrls: ['/images/user-123/reference.png'] },
+      },
+      generations: [{ _id: 'generation-1', status: 'pending' }],
+    });
+    mockImageService.runImageGeneration.mockResolvedValue([
+      { url: 'https://cdn.example.com/reference-result.png' },
+    ]);
+
+    const response = await request(app)
+      .post('/api/images/generate')
+      .send({
+        model: 'gpt-image-2',
+        prompt: '保留参考图构图',
+        params: {
+          size: '1024x1024',
+          imageUrls: ['/images/user-123/reference.png'],
+        },
+        imageNum: 1,
+      });
+
+    expect(response.status).toBe(200);
+    expect(mockDb.createGenerationBatchWithGenerations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: {
+          size: '1024x1024',
+          imageUrls: ['/images/user-123/reference.png'],
+        },
+      }),
+    );
+    await flushBackgroundJobs();
+    expect(mockImageService.runImageGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: {
+          size: '1024x1024',
+          imageUrls: ['/images/user-123/reference.png'],
+        },
+      }),
+    );
+  });
+
   it('marks rows failed in the background when image generation fails', async () => {
     mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
       batch: { _id: 'batch-1', prompt: 'prompt' },

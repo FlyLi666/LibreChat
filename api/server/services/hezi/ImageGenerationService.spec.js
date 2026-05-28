@@ -50,6 +50,29 @@ describe('ImageGenerationService', () => {
     });
   });
 
+  it('maps reference image URLs into NewAPI image request payloads', () => {
+    expect(
+      mapImageRequestPayload({
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '保留参考图构图，改成玻璃质感 App 图标',
+        params: {
+          size: '1024x1024',
+          quality: 'standard',
+          imageUrls: ['/images/user-123/reference.png'],
+        },
+        imageNum: 1,
+      }),
+    ).toEqual({
+      model: 'gpt-image-2',
+      prompt: '保留参考图构图，改成玻璃质感 App 图标',
+      n: 1,
+      size: '1024x1024',
+      quality: 'standard',
+      image_urls: ['/images/user-123/reference.png'],
+    });
+  });
+
   it('normalizes URL and base64 image responses', () => {
     expect(
       normalizeImageResponse({

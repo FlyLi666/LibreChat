@@ -6,6 +6,7 @@ import type { TImageBatch } from 'librechat-data-provider';
 import ImagePage, { mergeImageBatches } from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
+const mockUploadReferenceImage = jest.fn();
 const mockDeleteImageGeneration = jest.fn();
 const mockDeleteImageBatch = jest.fn();
 const mockUpdateImageTopic = jest.fn();
@@ -33,6 +34,7 @@ jest.mock('~/hooks', () => ({
       com_image_config_resolution: '分辨率',
       com_image_config_quality: '质量',
       com_image_config_image_num: '数量',
+      com_image_reference_image: '参考图',
       com_image_new_topic: '新建主题',
     })[key] ?? key,
 }));
@@ -68,6 +70,10 @@ jest.mock('~/data-provider/Images', () => ({
     mutateAsync: mockGenerateImage,
     isLoading: false,
   }),
+  useUploadImageMutation: () => ({
+    mutateAsync: mockUploadReferenceImage,
+    isLoading: false,
+  }),
   useDeleteImageGenerationMutation: () => ({
     mutateAsync: mockDeleteImageGeneration,
     isLoading: false,
@@ -100,6 +106,12 @@ describe('ImagePage', () => {
   beforeEach(() => {
     mockGenerateImage.mockReset();
     mockGenerateImage.mockResolvedValue({});
+    mockUploadReferenceImage.mockReset();
+    mockUploadReferenceImage.mockResolvedValue({
+      file_id: 'file-ref-1',
+      filepath: '/images/user-123/reference.png',
+      filename: 'reference.png',
+    });
     mockDeleteImageGeneration.mockReset();
     mockDeleteImageGeneration.mockResolvedValue(undefined);
     mockDeleteImageBatch.mockReset();
@@ -198,6 +210,32 @@ describe('ImagePage', () => {
         }),
       );
     });
+  });
+
+  it('uploads a reference image and submits it as imageUrls for img2img', async () => {
+    renderPage();
+
+    const reference = new File(['reference-image'], 'reference.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('参考图'), {
+      target: { files: [reference] },
+    });
+    fireEvent.change(screen.getByPlaceholderText('描述你想画的内容...'), {
+      target: { value: '保留参考图构图，改成玻璃质感 App 图标' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '生成' }));
+
+    await waitFor(() => {
+      expect(mockUploadReferenceImage).toHaveBeenCalledWith(expect.any(FormData));
+      expect(mockGenerateImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: '保留参考图构图，改成玻璃质感 App 图标',
+          params: expect.objectContaining({
+            imageUrls: ['/images/user-123/reference.png'],
+          }),
+        }),
+      );
+    });
+    expect(screen.getByText('reference.png')).toBeInTheDocument();
   });
 
   it('keeps the submitted prompt when generation returns failed rows', async () => {

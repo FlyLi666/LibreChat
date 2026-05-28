@@ -4,6 +4,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import type {
   TGenerateImageRequest,
   TGenerateImageResponse,
+  TFileUpload,
   TImageBatch,
   TImageTopic,
 } from 'librechat-data-provider';
@@ -47,6 +48,10 @@ export const useGenerateImageMutation = (): UseMutationResult<
       );
     },
   });
+};
+
+export const useUploadImageMutation = (): UseMutationResult<TFileUpload, unknown, FormData> => {
+  return useMutation((payload: FormData) => dataService.uploadImage(payload));
 };
 
 export const useDeleteImageGenerationMutation = (): UseMutationResult<void, unknown, string> => {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Maximize2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, ImagePlus, Maximize2, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
+import { v4 } from 'uuid';
 import type {
   TImageBatch,
   TImageModel,
@@ -16,6 +17,7 @@ import {
   useImageModelsQuery,
   useImageTopicsQuery,
   useUpdateImageTopicMutation,
+  useUploadImageMutation,
 } from '~/data-provider/Images';
 import { useLocalize } from '~/hooks';
 import { cn, triggerDownload } from '~/utils';
@@ -390,10 +392,16 @@ function GenerationCard({
 function ModelInspector({
   model,
   params,
+  referenceFile,
+  onReferenceFileChange,
+  onClearReferenceFile,
   onParamChange,
 }: {
   model: TImageModel | undefined;
   params: Params;
+  referenceFile: File | null;
+  onReferenceFileChange: (file: File | null) => void;
+  onClearReferenceFile: () => void;
   onParamChange: (name: string, value: unknown) => void;
 }) {
   const localize = useLocalize();
@@ -413,8 +421,34 @@ function ModelInspector({
           />
         ))}
       </div>
-      <div className="mt-5 rounded-lg border border-dashed border-border-medium p-4 text-sm text-text-secondary">
-        {localize('com_image_reference_image')}
+      <div className="mt-5 rounded-lg border border-dashed border-border-medium p-3 text-sm text-text-secondary">
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-text-primary hover:bg-surface-hover">
+          <ImagePlus className="h-4 w-4" />
+          <span>{localize('com_image_reference_image')}</span>
+          <input
+            className="sr-only"
+            type="file"
+            accept="image/*"
+            aria-label={localize('com_image_reference_image')}
+            onChange={(event) => onReferenceFileChange(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        {referenceFile && (
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-surface-primary px-3 py-2">
+            <span className="min-w-0 truncate text-xs text-text-secondary">
+              {referenceFile.name}
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              aria-label={localize('com_image_action_delete')}
+              onClick={onClearReferenceFile}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -439,6 +473,7 @@ export default function ImagePage() {
     isError: batchesError,
   } = useImageBatchesQuery(activeTopicId, { refetchInterval: activeTopicId ? 3000 : false });
   const generateMutation = useGenerateImageMutation();
+  const uploadImageMutation = useUploadImageMutation();
   const deleteBatchMutation = useDeleteImageBatchMutation();
   const deleteGenerationMutation = useDeleteImageGenerationMutation();
   const updateTopicMutation = useUpdateImageTopicMutation();
@@ -453,6 +488,7 @@ export default function ImagePage() {
   const [params, setParams] = useState<Params>(() => getDefaultImageParams(model));
   const [prompt, setPrompt] = useState('');
   const [inlineBatches, setInlineBatches] = useState<TImageBatch[]>([]);
+  const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [deletedGenerationIds, setDeletedGenerationIds] = useState<Set<string>>(() => new Set());
   const [deletedBatchIds, setDeletedBatchIds] = useState<Set<string>>(() => new Set());
 
@@ -502,12 +538,26 @@ export default function ImagePage() {
     }
     const imageNum = Number(params.imageNum || 1);
     try {
+      const nextParams: Params = { ...params };
+      if (referenceFile) {
+        const formData = new FormData();
+        formData.append('endpoint', 'default');
+        formData.append('file', referenceFile, encodeURIComponent(referenceFile.name));
+        formData.append('file_id', v4());
+        formData.append('width', '1');
+        formData.append('height', '1');
+        const upload = await uploadImageMutation.mutateAsync(formData);
+        const imageUrl = upload.filepath || upload.preview;
+        if (imageUrl) {
+          nextParams.imageUrls = [imageUrl];
+        }
+      }
       const response = await generateMutation.mutateAsync({
         topicId: activeTopicId,
         provider: model.provider,
         model: model.modelId,
         prompt: trimmed,
-        params,
+        params: nextParams,
         imageNum,
       });
       if (response.topic?._id) {
@@ -674,10 +724,12 @@ export default function ImagePage() {
               </div>
               <Button
                 className="ml-auto"
-                disabled={!prompt.trim() || generateMutation.isLoading}
+                disabled={
+                  !prompt.trim() || generateMutation.isLoading || uploadImageMutation.isLoading
+                }
                 onClick={submit}
               >
-                {generateMutation.isLoading
+                {generateMutation.isLoading || uploadImageMutation.isLoading
                   ? localize('com_image_generating')
                   : localize('com_image_generate')}
               </Button>
@@ -688,6 +740,9 @@ export default function ImagePage() {
       <ModelInspector
         model={model}
         params={params}
+        referenceFile={referenceFile}
+        onReferenceFileChange={setReferenceFile}
+        onClearReferenceFile={() => setReferenceFile(null)}
         onParamChange={(name, value) => setParams((prev) => ({ ...prev, [name]: value }))}
       />
     </div>
