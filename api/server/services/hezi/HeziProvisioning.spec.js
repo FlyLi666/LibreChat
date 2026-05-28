@@ -1,12 +1,8 @@
-jest.mock(
-  '@librechat/data-schemas',
-  () => ({
-    encryptV3: jest.fn((value) => `enc:${value}`),
-    decryptV3: jest.fn((value) => value.replace(/^enc:/, '')),
-    logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
-  }),
-  { virtual: true },
-);
+jest.mock('@librechat/data-schemas', () => ({
+  encryptV3: jest.fn((value) => `enc:${value}`),
+  decryptV3: jest.fn((value) => value.replace(/^enc:/, '')),
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
 jest.mock('./NewapiClient', () => ({
   NewapiError: class NewapiError extends Error {},
@@ -34,6 +30,7 @@ const {
   findShadowUserByUsername,
   loginAsUser,
   createUserToken,
+  redeemQuotaCode,
   deleteShadowUser,
 } = require('./NewapiClient');
 const {
@@ -45,6 +42,7 @@ const {
 } = require('~/models');
 const {
   provisionShadowAccount,
+  ensureQuotaRedeemed,
   recordProvisioningError,
   cleanupShadowAccount,
 } = require('./HeziProvisioning');
@@ -56,6 +54,7 @@ describe('HeziProvisioning', () => {
     findShadowUserByUsername.mockResolvedValue({ id: 42 });
     loginAsUser.mockResolvedValue({ cookie: 'session=abc', userId: 42 });
     createUserToken.mockResolvedValue('sk-test');
+    redeemQuotaCode.mockResolvedValue({ success: true });
     deleteShadowUser.mockResolvedValue(true);
     findOnePluginAuth.mockResolvedValue(null);
     updatePluginAuth.mockResolvedValue({});
@@ -117,6 +116,36 @@ describe('HeziProvisioning', () => {
       step: 'login_fallback',
       error: 'NewAPI temporarily unavailable',
       retryCount: 3,
+    });
+  });
+
+  test('retries quota redemption from stored shadow credentials when login fallback finds it pending', async () => {
+    findOnePluginAuth.mockImplementation(async ({ authField }) => {
+      const rows = {
+        quota_redeemed: { value: 'enc:0' },
+        quota_code: { value: 'enc:quota-5-yuan' },
+        password: { value: 'enc:Password2345678' },
+        newapi_user_id: { value: 'enc:42' },
+      };
+      return rows[authField] || null;
+    });
+
+    await ensureQuotaRedeemed('66554433221100ffeeddccbb');
+
+    expect(loginAsUser).toHaveBeenCalledWith({
+      username: 'hezi_00ffeeddccbb',
+      password: 'Password2345678',
+    });
+    expect(redeemQuotaCode).toHaveBeenCalledWith({
+      cookie: 'session=abc',
+      userId: 42,
+      code: 'quota-5-yuan',
+    });
+    expect(updatePluginAuth).toHaveBeenCalledWith({
+      userId: '66554433221100ffeeddccbb',
+      pluginKey: 'newapi-shadow',
+      authField: 'quota_redeemed',
+      value: 'enc:1',
     });
   });
 

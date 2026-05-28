@@ -67,10 +67,35 @@ describe('image generation routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     imagesRouter._resetImageGenerationQueueForTests?.();
-    mockImageService.getImageModel.mockReturnValue({
-      provider: 'openai',
-      modelId: 'gpt-image-2',
-      disabled: false,
+    mockImageService.getImageModel.mockImplementation((modelId) => {
+      if (modelId === 'dall-e-3') {
+        return {
+          provider: 'openai',
+          modelId: 'dall-e-3',
+          disabled: false,
+          paramSchemas: [
+            { name: 'size', type: 'enum', default: '1024x1024', enum: ['1024x1024'] },
+            { name: 'quality', type: 'enum', default: 'standard', enum: ['standard', 'hd'] },
+            { name: 'imageNum', type: 'number', default: 1, min: 1, max: 1 },
+          ],
+        };
+      }
+      return {
+        provider: 'openai',
+        modelId: 'gpt-image-2',
+        disabled: false,
+        paramSchemas: [
+          {
+            name: 'imageUrls',
+            type: 'images',
+            default: [],
+            maxCount: 1,
+          },
+          { name: 'size', type: 'enum', default: '1024x1024', enum: ['1024x1024'] },
+          { name: 'quality', type: 'enum', default: 'standard', enum: ['standard', 'hd'] },
+          { name: 'imageNum', type: 'number', default: 1, min: 1, max: 4 },
+        ],
+      };
     });
     mockImageService.getImageModels.mockReturnValue([
       { provider: 'openai', modelId: 'gpt-image-2', disabled: false },
@@ -345,6 +370,58 @@ describe('image generation routes', () => {
     expect(mockDb.getGenerationTopic).toHaveBeenCalledWith({
       userId: 'user-123',
       topicId: '507f1f77bcf86cd799439011',
+    });
+    expect(mockDb.createGenerationBatchWithGenerations).not.toHaveBeenCalled();
+  });
+
+  it('rejects params that are not declared by the selected model schema', async () => {
+    const response = await request(app)
+      .post('/api/images/generate')
+      .send({
+        model: 'gpt-image-2',
+        prompt: 'prompt',
+        params: { size: '1024x1024', unsupported: true },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: 'IMAGE_PARAM_INVALID',
+      message: 'unsupported is not supported by gpt-image-2',
+    });
+    expect(mockDb.createGenerationBatchWithGenerations).not.toHaveBeenCalled();
+  });
+
+  it('rejects image counts above the selected model schema maximum before creating rows', async () => {
+    const response = await request(app)
+      .post('/api/images/generate')
+      .send({
+        model: 'gpt-image-2',
+        prompt: 'prompt',
+        params: { size: '1024x1024' },
+        imageNum: 9,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: 'IMAGE_PARAM_INVALID',
+      message: 'imageNum must be between 1 and 4',
+    });
+    expect(mockDb.createGenerationBatchWithGenerations).not.toHaveBeenCalled();
+  });
+
+  it('rejects reference images for models that do not declare imageUrls support', async () => {
+    const response = await request(app)
+      .post('/api/images/generate')
+      .send({
+        model: 'dall-e-3',
+        prompt: 'prompt',
+        params: { size: '1024x1024', imageUrls: ['/images/user-123/reference.png'] },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: 'IMAGE_PARAM_INVALID',
+      message: 'imageUrls is not supported by dall-e-3',
     });
     expect(mockDb.createGenerationBatchWithGenerations).not.toHaveBeenCalled();
   });

@@ -5,14 +5,15 @@ const { setAuthTokens } = require('~/server/services/AuthService');
 const {
   hasShadowAccount,
   provisionShadowAccount,
+  ensureQuotaRedeemed,
   recordProvisioningError,
 } = require('~/server/services/hezi/HeziProvisioning');
 
-const recordFallbackError = async (userId, error) => {
+const recordFallbackError = async (userId, error, step = 'login_fallback') => {
   try {
     await recordProvisioningError({
       userId,
-      step: 'login_fallback',
+      step,
       error,
     });
   } catch (recordError) {
@@ -31,6 +32,15 @@ const ensureHeziShadowAccount = async (user) => {
   try {
     const hasShadow = await hasShadowAccount(userId);
     if (hasShadow) {
+      try {
+        await ensureQuotaRedeemed(userId);
+      } catch (error) {
+        logger.warn('[loginController] HeZi quota redemption fallback failed', {
+          userId,
+          error: error.message,
+        });
+        await recordFallbackError(userId, error, 'login_quota_redeem');
+      }
       return;
     }
     await provisionShadowAccount({ user });

@@ -116,7 +116,7 @@ export default function ExportModal({
                     role="note"
                     data-testid="export-png-hint"
                   >
-                    {localize('com_nav_export_png_hint')}
+                    {localize('com_ui_export_png_hint')}
                   </p>
                 ) : null}
               </div>

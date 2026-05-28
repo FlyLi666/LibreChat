@@ -41,6 +41,20 @@ import { usePauseGlobalAudio } from './Audio';
 import { useHasAccess } from '~/hooks';
 import store from '~/store';
 
+export const shouldPreserveNewChatDraft = ({
+  template,
+  preset,
+}: {
+  template?: Partial<TConversation>;
+  preset?: Partial<TPreset>;
+}) =>
+  preset != null ||
+  (template != null &&
+    (template.endpoint != null ||
+      template.model != null ||
+      template.spec != null ||
+      template.endpointType != null));
+
 const useNewConvo = (index = 0) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -316,13 +330,10 @@ const useNewConvo = (index = 0) => {
         // when the caller explicitly starts a fresh new chat (no preset, no
         // model/endpoint/spec hint in the template). Without this guard, picking
         // a different model erases the user's typed message + attached files.
-        const isModelSwitchOnly =
-          _preset != null ||
-          (_template != null &&
-            (_template.endpoint != null ||
-              _template.model != null ||
-              _template.spec != null ||
-              _template.endpointType != null));
+        const isModelSwitchOnly = shouldPreserveNewChatDraft({
+          template: _template,
+          preset: _preset,
+        });
 
         if (!isModelSwitchOnly) {
           const filesToDelete = Array.from(files.values())

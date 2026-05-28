@@ -14,6 +14,14 @@ const imageModels = [
     disabled: false,
     paramSchemas: [
       {
+        name: 'imageUrls',
+        type: 'images',
+        default: [],
+        maxCount: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        i18nLabel: 'com_image_reference_image',
+      },
+      {
         name: 'size',
         type: 'enum',
         default: '1024x1024',
@@ -53,6 +61,14 @@ const imageModels = [
     displayName: 'Nano Banana',
     disabled: false,
     paramSchemas: [
+      {
+        name: 'imageUrls',
+        type: 'images',
+        default: [],
+        maxCount: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        i18nLabel: 'com_image_reference_image',
+      },
       {
         name: 'aspectRatio',
         type: 'enum',
@@ -141,6 +157,14 @@ const imageModels = [
     reason: 'not_configured',
     paramSchemas: [
       {
+        name: 'imageUrls',
+        type: 'images',
+        default: [],
+        maxCount: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        i18nLabel: 'com_image_reference_image',
+      },
+      {
         name: 'strength',
         type: 'number',
         default: 0.7,
@@ -210,6 +234,30 @@ function clampImageNum(value, max = 4) {
   return Math.min(Math.max(Math.floor(parsed), 1), max);
 }
 
+function getPublicImageBaseUrl() {
+  return (
+    process.env.HEZI_IMAGE_PUBLIC_BASE_URL ||
+    process.env.DOMAIN_SERVER ||
+    process.env.DOMAIN_CLIENT ||
+    'http://localhost:3080'
+  ).replace(/\/+$/, '');
+}
+
+function normalizeReferenceImageUrls(imageUrls = []) {
+  return imageUrls
+    .filter((url) => typeof url === 'string' && url.trim())
+    .map((url) => {
+      const trimmed = url.trim();
+      if (/^(https?:|data:)/i.test(trimmed)) {
+        return trimmed;
+      }
+      if (trimmed.startsWith('/')) {
+        return `${getPublicImageBaseUrl()}${trimmed}`;
+      }
+      return trimmed;
+    });
+}
+
 function mapImageRequestPayload({ provider, model, prompt, params = {}, imageNum = 1 }) {
   const modelDef = getImageModel(model);
   const nSchema = modelDef?.paramSchemas?.find((schema) => schema.name === 'imageNum');
@@ -228,7 +276,7 @@ function mapImageRequestPayload({ provider, model, prompt, params = {}, imageNum
       payload.quality = params.quality;
     }
     if (params.imageUrls?.length) {
-      payload.image_urls = params.imageUrls;
+      payload.image_urls = normalizeReferenceImageUrls(params.imageUrls);
     }
     return payload;
   }
@@ -240,7 +288,7 @@ function mapImageRequestPayload({ provider, model, prompt, params = {}, imageNum
     payload.resolution = params.resolution;
   }
   if (params.imageUrls?.length) {
-    payload.image_urls = params.imageUrls;
+    payload.image_urls = normalizeReferenceImageUrls(params.imageUrls);
   }
   return payload;
 }
@@ -409,6 +457,7 @@ module.exports = {
   getImageModel,
   getLiveImageModels,
   mapImageRequestPayload,
+  normalizeReferenceImageUrls,
   normalizeImageResponse,
   runImageGeneration,
 };

@@ -7,6 +7,14 @@ const imageModels: TImageModel[] = [
     displayName: 'GPT Image 2',
     paramSchemas: [
       {
+        name: 'imageUrls',
+        type: 'images',
+        default: [],
+        maxCount: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        i18nLabel: 'com_image_reference_image',
+      },
+      {
         name: 'size',
         type: 'enum',
         default: '1024x1024',
@@ -45,6 +53,14 @@ const imageModels: TImageModel[] = [
     modelId: 'gemini-3.1-flash-image-preview',
     displayName: 'Nano Banana',
     paramSchemas: [
+      {
+        name: 'imageUrls',
+        type: 'images',
+        default: [],
+        maxCount: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        i18nLabel: 'com_image_reference_image',
+      },
       {
         name: 'aspectRatio',
         type: 'enum',
@@ -101,11 +117,42 @@ const imageModels: TImageModel[] = [
     ],
   },
   {
+    provider: 'google',
+    modelId: 'imagen-4',
+    displayName: 'Imagen 4',
+    paramSchemas: [
+      {
+        name: 'aspectRatio',
+        type: 'enum',
+        default: '1:1',
+        enum: ['1:1', '16:9', '9:16', '3:4', '4:3'],
+        i18nLabel: 'com_image_config_aspect',
+      },
+      {
+        name: 'imageNum',
+        type: 'number',
+        default: 1,
+        min: 1,
+        max: 4,
+        step: 1,
+        i18nLabel: 'com_image_config_image_num',
+      },
+    ],
+  },
+  {
     provider: 'flux',
     modelId: 'flux-kontext-dev',
     displayName: 'Flux Kontext Dev',
     disabled: true,
     paramSchemas: [
+      {
+        name: 'imageUrls',
+        type: 'images',
+        default: [],
+        maxCount: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        i18nLabel: 'com_image_reference_image',
+      },
       {
         name: 'strength',
         type: 'number',

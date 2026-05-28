@@ -461,6 +461,7 @@
   "com_nav_export_recursive_or_sequential": "递归或顺序？",
   "com_nav_export_png_hint": "PNG 导出会把整段对话渲染成一张图片，长会话可能需要 10–30 秒，请保持此弹窗打开直到下载开始。",
   "com_nav_export_type": "类型",
+  "com_ui_export_png_hint": "PNG 生成较慢，请耐心等待。若 1 分钟内未开始下载，请重试一次，请勿连续点击。",
   "com_nav_external": "外部",
   "com_nav_font_size": "消息字体大小",
   "com_nav_font_size_base": "中号",

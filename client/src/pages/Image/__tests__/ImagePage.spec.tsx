@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/extend-expect';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { TImageBatch } from 'librechat-data-provider';
-import ImagePage, { mergeImageBatches } from '../ImagePage';
+import ImagePage, { filterDeletedGenerations, groupTopics, mergeImageBatches } from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
 const mockUploadReferenceImage = jest.fn();
@@ -11,6 +11,7 @@ const mockDeleteImageGeneration = jest.fn();
 const mockDeleteImageBatch = jest.fn();
 const mockUpdateImageTopic = jest.fn();
 const mockDeleteImageTopic = jest.fn();
+let mockStartupConfig: Record<string, unknown> = {};
 let mockBatchesLoading = false;
 let mockBatches: unknown[] = [];
 let mockTopics: unknown[] = [];
@@ -39,6 +40,10 @@ jest.mock('~/hooks', () => ({
     })[key] ?? key,
 }));
 
+jest.mock('~/data-provider', () => ({
+  useGetStartupConfig: () => ({ data: mockStartupConfig }),
+}));
+
 jest.mock('~/data-provider/Images', () => ({
   useImageModelsQuery: () => ({
     data: [
@@ -47,6 +52,7 @@ jest.mock('~/data-provider/Images', () => ({
         modelId: 'gpt-image-2',
         displayName: 'GPT Image 2',
         paramSchemas: [
+          { name: 'imageUrls', type: 'images', default: [], maxCount: 1 },
           { name: 'size', type: 'enum', default: '1024x1024', enum: ['1024x1024'] },
           { name: 'quality', type: 'enum', default: 'standard', enum: ['standard', 'hd'] },
           { name: 'imageNum', type: 'number', default: 1, min: 1, max: 4, step: 1 },
@@ -57,9 +63,20 @@ jest.mock('~/data-provider/Images', () => ({
         modelId: 'gemini-3.1-flash-image-preview',
         displayName: 'Nano Banana',
         paramSchemas: [
+          { name: 'imageUrls', type: 'images', default: [], maxCount: 1 },
           { name: 'aspectRatio', type: 'enum', default: '1:1', enum: ['1:1', '16:9'] },
           { name: 'resolution', type: 'enum', default: '1K', enum: ['512', '1K'] },
           { name: 'imageNum', type: 'number', default: 1, min: 1, max: 4, step: 1 },
+        ],
+      },
+      {
+        provider: 'openai',
+        modelId: 'dall-e-3',
+        displayName: 'DALL-E 3',
+        paramSchemas: [
+          { name: 'size', type: 'enum', default: '1024x1024', enum: ['1024x1024'] },
+          { name: 'quality', type: 'enum', default: 'standard', enum: ['standard', 'hd'] },
+          { name: 'imageNum', type: 'number', default: 1, min: 1, max: 1, step: 1 },
         ],
       },
     ],
@@ -124,9 +141,33 @@ describe('ImagePage', () => {
     });
     mockDeleteImageTopic.mockReset();
     mockDeleteImageTopic.mockResolvedValue(undefined);
+    mockStartupConfig = {};
     mockTopics = [];
     mockBatches = [];
     mockBatchesLoading = false;
+  });
+
+  it('groups topics by today, yesterday, past 7 days, and older dates', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-29T12:00:00+08:00'));
+    const groups = groupTopics([
+      { _id: 'topic-today', title: '今日主题', type: 'image', updatedAt: '2026-05-29T02:00:00Z' },
+      {
+        _id: 'topic-yesterday',
+        title: '昨日主题',
+        type: 'image',
+        updatedAt: '2026-05-28T02:00:00Z',
+      },
+      { _id: 'topic-week', title: '七天内主题', type: 'image', updatedAt: '2026-05-25T02:00:00Z' },
+      { _id: 'topic-old', title: '更早主题', type: 'image', updatedAt: '2026-05-10T02:00:00Z' },
+    ]);
+
+    expect(groups.map((group) => [group.label, group.topics.map((topic) => topic._id)])).toEqual([
+      ['今天', ['topic-today']],
+      ['昨天', ['topic-yesterday']],
+      ['过去 7 天', ['topic-week']],
+      ['更早', ['topic-old']],
+    ]);
+    jest.useRealTimers();
   });
 
   it('renders the empty state and default gpt-image-2 controls', () => {
@@ -137,6 +178,15 @@ describe('ImagePage', () => {
     expect(screen.getAllByText('尺寸').length).toBeGreaterThan(0);
     expect(screen.getAllByText('质量').length).toBeGreaterThan(0);
     expect(screen.getAllByText('数量').length).toBeGreaterThan(0);
+  });
+
+  it('uses the startup-configured image model as the default selection', () => {
+    mockStartupConfig = { imageGenDefaultModel: 'dall-e-3' };
+
+    renderPage();
+
+    expect(screen.getByDisplayValue('dall-e-3')).toBeInTheDocument();
+    expect(screen.queryByLabelText('参考图')).not.toBeInTheDocument();
   });
 
   it('prefers refreshed remote batches over matching inline pending batches', () => {
@@ -168,6 +218,19 @@ describe('ImagePage', () => {
     expect(mergeImageBatches([pendingBatch], [succeededBatch])).toEqual([succeededBatch]);
   });
 
+  it('does not crash when an optimistic batch has no generations yet', () => {
+    const optimisticBatch = {
+      _id: 'batch-optimistic',
+      topicId: 'topic-1',
+      provider: 'openai',
+      prompt: '蓝色玻璃 App 图标',
+      model: 'gpt-image-2',
+      params: {},
+    } as TImageBatch;
+
+    expect(filterDeletedGenerations([optimisticBatch], new Set())).toEqual([]);
+  });
+
   it('shows the empty state when no topic is selected and the batches query is disabled', () => {
     mockBatchesLoading = true;
 
@@ -187,6 +250,18 @@ describe('ImagePage', () => {
     expect(screen.getAllByText('比例').length).toBeGreaterThan(0);
     expect(screen.getAllByText('分辨率').length).toBeGreaterThan(0);
     expect(screen.queryByText('质量')).not.toBeInTheDocument();
+  });
+
+  it('only shows the reference image upload for models with imageUrls support', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('参考图')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Model'), {
+      target: { value: 'dall-e-3' },
+    });
+
+    expect(screen.queryByLabelText('参考图')).not.toBeInTheDocument();
   });
 
   it('submits prompt, model, params, and image count', async () => {

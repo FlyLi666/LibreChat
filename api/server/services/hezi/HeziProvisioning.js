@@ -60,6 +60,10 @@ function getNewapiV1BaseUrl() {
   return base.endsWith('/v1') ? base : `${base}/v1`;
 }
 
+function getShadowUsername(userId) {
+  return `hezi_${String(userId).slice(-12)}`;
+}
+
 async function storeEndpointKey(userId, sk) {
   await updateUserKey({
     userId: String(userId),
@@ -85,7 +89,7 @@ async function provisionShadowAccount({ user, quotaCode }) {
     throw new Error('provisionShadowAccount: user._id missing');
   }
   const userId = String(user._id);
-  const username = `hezi_${userId.slice(-12)}`; // <= 17 chars; NewAPI accepts
+  const username = getShadowUsername(userId); // <= 17 chars; NewAPI accepts
   const displayName = username;
   const password = generateShadowPassword();
 
@@ -166,6 +170,48 @@ async function hasShadowAccount(userId) {
   return !!row;
 }
 
+async function getStoredShadowField(userId, authField) {
+  const row = await findOnePluginAuth({
+    userId: String(userId),
+    pluginKey: PLUGIN_KEY,
+    authField,
+  });
+  return row?.value ? decryptV3(row.value) : '';
+}
+
+async function ensureQuotaRedeemed(userId) {
+  const normalizedUserId = String(userId);
+  const redeemed = await getStoredShadowField(normalizedUserId, 'quota_redeemed');
+  if (redeemed === '1') {
+    return { redeemed: false, skipped: true };
+  }
+
+  const quotaCode = await getStoredShadowField(normalizedUserId, 'quota_code');
+  if (!quotaCode) {
+    return { redeemed: false, skipped: true };
+  }
+
+  const password = await getStoredShadowField(normalizedUserId, 'password');
+  const newapiUserId = Number(await getStoredShadowField(normalizedUserId, 'newapi_user_id'));
+  if (!password || !Number.isFinite(newapiUserId)) {
+    throw new Error('HEZI_QUOTA_REDEEM_MISSING_SHADOW_CREDENTIALS');
+  }
+
+  const session = await loginAsUser({
+    username: getShadowUsername(normalizedUserId),
+    password,
+  });
+  await redeemQuotaCode({
+    cookie: session.cookie,
+    userId: session.userId || newapiUserId,
+    code: quotaCode,
+  });
+  await storeShadow(normalizedUserId, {
+    quota_redeemed: '1',
+  });
+  return { redeemed: true };
+}
+
 function serializeError(error) {
   if (!error) {
     return 'Unknown error';
@@ -242,6 +288,7 @@ async function rollbackShadowAccount(userId) {
 module.exports = {
   provisionShadowAccount,
   hasShadowAccount,
+  ensureQuotaRedeemed,
   recordProvisioningError,
   cleanupShadowAccount,
   rollbackShadowAccount,

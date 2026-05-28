@@ -1,7 +1,7 @@
 import { getImageModel, getImageModels } from './modelParams';
 
 describe('image model params', () => {
-  it('defaults to gpt-image-2 with a compact text-to-image schema', () => {
+  it('defaults to gpt-image-2 with text-to-image and reference-image schema', () => {
     const model = getImageModel('gpt-image-2');
 
     expect(model).toMatchObject({
@@ -9,7 +9,12 @@ describe('image model params', () => {
       modelId: 'gpt-image-2',
       displayName: 'GPT Image 2',
     });
-    expect(model?.paramSchemas.map((schema) => schema.name)).toEqual(['size', 'quality', 'imageNum']);
+    expect(model?.paramSchemas.map((schema) => schema.name)).toEqual([
+      'imageUrls',
+      'size',
+      'quality',
+      'imageNum',
+    ]);
   });
 
   it('adapts schemas by model family', () => {
@@ -20,7 +25,11 @@ describe('image model params', () => {
     ]);
     expect(
       getImageModel('gemini-3.1-flash-image-preview')?.paramSchemas.map((schema) => schema.name),
-    ).toEqual(['aspectRatio', 'resolution', 'imageNum']);
+    ).toEqual(['imageUrls', 'aspectRatio', 'resolution', 'imageNum']);
+    expect(getImageModel('imagen-4')?.paramSchemas.map((schema) => schema.name)).toEqual([
+      'aspectRatio',
+      'imageNum',
+    ]);
   });
 
   it('keeps disabled future models out of the default enabled set', () => {

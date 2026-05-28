@@ -29,8 +29,8 @@ process.env.BAN_INTERVAL = '20';
 process.env.CI = 'true';
 process.env.JWT_SECRET = 'test';
 process.env.JWT_REFRESH_SECRET = 'test';
-process.env.CREDS_KEY = 'test';
-process.env.CREDS_IV = 'test';
+process.env.CREDS_KEY = 'c3301ad2f69681295e022fb135e92787afb6ecfeaa012a10f8bb4ddf6b669e6d';
+process.env.CREDS_IV = 'cd02538f4be2fa37aba9420b5924389f';
 process.env.ALLOW_EMAIL_LOGIN = 'true';
 
 // Set global test timeout to 30 seconds

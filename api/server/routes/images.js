@@ -53,6 +53,105 @@ function getRecoveryJobRequest({ appConfig, batch }) {
   };
 }
 
+function makeImageParamError(message) {
+  const error = new Error(message);
+  error.code = 'IMAGE_PARAM_INVALID';
+  return error;
+}
+
+function validateParamValue({ schema, value }) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (schema.type === 'enum') {
+    if (typeof value !== 'string' || !(schema.enum || []).includes(value)) {
+      throw makeImageParamError(`${schema.name} must be one of ${(schema.enum || []).join(', ')}`);
+    }
+    return value;
+  }
+
+  if (schema.type === 'number') {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      throw makeImageParamError(`${schema.name} must be a number`);
+    }
+    if (typeof schema.min === 'number' && parsed < schema.min) {
+      throw makeImageParamError(`${schema.name} must be between ${schema.min} and ${schema.max}`);
+    }
+    if (typeof schema.max === 'number' && parsed > schema.max) {
+      throw makeImageParamError(`${schema.name} must be between ${schema.min} and ${schema.max}`);
+    }
+    return parsed;
+  }
+
+  if (schema.type === 'boolean') {
+    if (typeof value !== 'boolean') {
+      throw makeImageParamError(`${schema.name} must be a boolean`);
+    }
+    return value;
+  }
+
+  if (schema.type === 'string') {
+    if (typeof value !== 'string') {
+      throw makeImageParamError(`${schema.name} must be a string`);
+    }
+    return value;
+  }
+
+  if (schema.type === 'image') {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw makeImageParamError(`${schema.name} must be an image URL`);
+    }
+    return value.trim();
+  }
+
+  if (schema.type === 'images') {
+    if (!Array.isArray(value)) {
+      throw makeImageParamError(`${schema.name} must be an array of image URLs`);
+    }
+    if (typeof schema.maxCount === 'number' && value.length > schema.maxCount) {
+      throw makeImageParamError(`${schema.name} supports at most ${schema.maxCount} image(s)`);
+    }
+    const urls = value.map((item) => {
+      if (typeof item !== 'string' || !item.trim()) {
+        throw makeImageParamError(`${schema.name} must contain image URLs`);
+      }
+      return item.trim();
+    });
+    return urls;
+  }
+
+  return value;
+}
+
+function validateImageRequestParams({ modelDef, params, imageNum }) {
+  const schemaMap = new Map((modelDef.paramSchemas || []).map((schema) => [schema.name, schema]));
+  const nextParams = {};
+
+  for (const [name, value] of Object.entries(params || {})) {
+    const schema = schemaMap.get(name);
+    if (!schema) {
+      throw makeImageParamError(`${name} is not supported by ${modelDef.modelId}`);
+    }
+    const nextValue = validateParamValue({ schema, value });
+    if (nextValue !== undefined) {
+      nextParams[name] = nextValue;
+    }
+  }
+
+  const imageNumSchema = schemaMap.get('imageNum');
+  const nextImageNum = validateParamValue({
+    schema: imageNumSchema || { name: 'imageNum', type: 'number', min: 1, max: 4 },
+    value: imageNum,
+  });
+
+  return {
+    params: nextParams,
+    imageNum: nextImageNum,
+  };
+}
+
 async function runImageGenerationJob({
   req,
   userId,
@@ -219,8 +318,8 @@ router.post('/generate', async (req, res) => {
   const model = String(req.body?.model || process.env.IMAGE_GEN_DEFAULT_MODEL || 'gpt-image-2');
   const modelDef = getImageModel(model);
   const provider = String(req.body?.provider || modelDef?.provider || 'openai');
-  const params = req.body?.params && typeof req.body.params === 'object' ? req.body.params : {};
-  const imageNum = Number(req.body?.imageNum || params.imageNum || 1);
+  const rawParams = req.body?.params && typeof req.body.params === 'object' ? req.body.params : {};
+  const rawImageNum = req.body?.imageNum ?? rawParams.imageNum ?? 1;
 
   if (!prompt) {
     return res.status(400).json({ error: 'Prompt is required' });
@@ -230,6 +329,19 @@ router.post('/generate', async (req, res) => {
   }
   if (modelDef.disabled) {
     return res.status(400).json({ error: 'IMAGE_MODEL_DISABLED' });
+  }
+
+  let params = rawParams;
+  let imageNum = Number(rawImageNum);
+  try {
+    const validated = validateImageRequestParams({ modelDef, params: rawParams, imageNum });
+    params = validated.params;
+    imageNum = validated.imageNum;
+  } catch (error) {
+    if (error.code === 'IMAGE_PARAM_INVALID') {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+    throw error;
   }
 
   let topicId = req.body?.topicId;

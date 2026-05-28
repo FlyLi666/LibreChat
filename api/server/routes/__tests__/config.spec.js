@@ -102,6 +102,7 @@ afterEach(() => {
   delete process.env.SAML_SESSION_SECRET;
   delete process.env.ALLOW_ACCOUNT_DELETION;
   delete process.env.NOTEBOOKLM_URL;
+  delete process.env.IMAGE_GEN_DEFAULT_MODEL;
 });
 
 describe('GET /api/config', () => {
@@ -215,6 +216,16 @@ describe('GET /api/config', () => {
       const response = await request(app).get('/api/config');
 
       expect(response.body.notebookLmUrl).toBe('https://notebook.example.com');
+    });
+
+    it('should include the configured image generation default model', async () => {
+      mockGetAppConfig.mockResolvedValue(baseAppConfig);
+      process.env.IMAGE_GEN_DEFAULT_MODEL = 'dall-e-3';
+      const app = createApp(null);
+
+      const response = await request(app).get('/api/config');
+
+      expect(response.body.imageGenDefaultModel).toBe('dall-e-3');
     });
 
     it('should advertise CloudFront cookie refresh only when signed-cookie mode is active', async () => {

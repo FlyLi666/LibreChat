@@ -88,6 +88,7 @@ function buildSharedPayload() {
       process.env.SHOW_BIRTHDAY_ICON === '',
     helpAndFaqURL: process.env.HELP_AND_FAQ_URL || 'https://librechat.ai',
     notebookLmUrl: process.env.NOTEBOOKLM_URL || undefined,
+    imageGenDefaultModel: process.env.IMAGE_GEN_DEFAULT_MODEL || undefined,
     sharedLinksEnabled,
     publicSharedLinksEnabled,
     analyticsGtmId: process.env.ANALYTICS_GTM_ID,

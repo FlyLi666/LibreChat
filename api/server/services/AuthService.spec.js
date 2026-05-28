@@ -41,12 +41,21 @@ jest.mock('~/models', () => ({
   generateToken: jest.fn(),
   deleteUserById: jest.fn(),
   generateRefreshToken: jest.fn(),
+  consumeInviteCode: jest.fn(),
 }));
-jest.mock('~/strategies/validators', () => ({ registerSchema: { parse: jest.fn() } }));
+jest.mock('~/strategies/validators', () => ({
+  registerSchema: { parse: jest.fn(), safeParse: jest.fn(() => ({ success: true })) },
+}));
 jest.mock('~/server/services/Config', () => ({ getAppConfig: jest.fn() }));
 jest.mock('~/server/utils', () => ({ sendEmail: jest.fn() }));
+jest.mock('~/server/services/hezi/HeziProvisioning', () => ({
+  provisionShadowAccount: jest.fn(),
+  rollbackShadowAccount: jest.fn(),
+  recordProvisioningError: jest.fn(),
+}));
 
 const {
+  checkEmailConfig,
   shouldUseSecureCookie,
   isEmailDomainAllowed,
   resolveAppConfigForUser,
@@ -58,14 +67,25 @@ const jwt = require('jsonwebtoken');
 const { logger } = require('@librechat/data-schemas');
 const {
   findUser,
+  createUser,
+  updateUser,
+  countUsers,
   getUserById,
   generateToken,
   generateRefreshToken,
   createSession,
+  deleteUserById,
+  consumeInviteCode,
 } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const {
+  provisionShadowAccount,
+  rollbackShadowAccount,
+  recordProvisioningError,
+} = require('~/server/services/hezi/HeziProvisioning');
+const {
   setOpenIDAuthTokens,
+  registerUser,
   requestPasswordReset,
   setAuthTokens,
   setCloudFrontAuthCookies,
@@ -443,6 +463,73 @@ describe('requestPasswordReset', () => {
 
     expect(result).not.toBeInstanceOf(Error);
     expect(result.message).toContain('If an account with that email exists');
+  });
+});
+
+describe('registerUser HeZi provisioning', () => {
+  const originalRequireInvite = process.env.HEZI_REQUIRE_INVITE_CODE;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.HEZI_REQUIRE_INVITE_CODE = 'true';
+    isEmailDomainAllowed.mockReturnValue(true);
+    checkEmailConfig.mockReturnValue(false);
+    getAppConfig.mockResolvedValue({
+      registration: { allowedDomains: ['example.com'] },
+      balance: {},
+    });
+    findUser.mockResolvedValue(null);
+    countUsers.mockResolvedValue(1);
+    createUser.mockResolvedValue({
+      _id: 'user-123',
+      email: 'teacher@example.com',
+      emailVerified: false,
+    });
+    updateUser.mockResolvedValue({});
+    consumeInviteCode.mockResolvedValue({ code: 'INVITE1' });
+    rollbackShadowAccount.mockResolvedValue(undefined);
+    recordProvisioningError.mockResolvedValue(undefined);
+  });
+
+  afterAll(() => {
+    if (originalRequireInvite === undefined) {
+      delete process.env.HEZI_REQUIRE_INVITE_CODE;
+    } else {
+      process.env.HEZI_REQUIRE_INVITE_CODE = originalRequireInvite;
+    }
+  });
+
+  it('keeps the LibreChat user and records a retryable error when NewAPI provisioning fails after registration', async () => {
+    const provisioningError = new Error('NewAPI temporarily unavailable');
+    provisionShadowAccount.mockRejectedValue(provisioningError);
+
+    const result = await registerUser(
+      {
+        email: 'teacher@example.com',
+        password: 'correct horse battery staple',
+        name: 'Teacher',
+        username: 'teacher',
+      },
+      {
+        heziInviteCode: {
+          code: 'INVITE1',
+          quotaCode: 'QUOTA1',
+        },
+      },
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      message: 'Please check your email to verify your email address.',
+    });
+    expect(deleteUserById).not.toHaveBeenCalled();
+    expect(consumeInviteCode).not.toHaveBeenCalled();
+    expect(rollbackShadowAccount).toHaveBeenCalledWith('user-123');
+    expect(recordProvisioningError).toHaveBeenCalledWith({
+      userId: 'user-123',
+      step: 'registration',
+      error: provisioningError,
+    });
   });
 });
 

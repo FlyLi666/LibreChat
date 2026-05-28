@@ -2,6 +2,7 @@ const mockGenerate2FATempToken = jest.fn();
 const mockSetAuthTokens = jest.fn();
 const mockHasShadowAccount = jest.fn();
 const mockProvisionShadowAccount = jest.fn();
+const mockEnsureQuotaRedeemed = jest.fn();
 const mockRecordProvisioningError = jest.fn();
 
 jest.mock(
@@ -31,6 +32,7 @@ jest.mock('~/server/services/AuthService', () => ({
 jest.mock('~/server/services/hezi/HeziProvisioning', () => ({
   hasShadowAccount: (...args) => mockHasShadowAccount(...args),
   provisionShadowAccount: (...args) => mockProvisionShadowAccount(...args),
+  ensureQuotaRedeemed: (...args) => mockEnsureQuotaRedeemed(...args),
   recordProvisioningError: (...args) => mockRecordProvisioningError(...args),
 }));
 
@@ -50,6 +52,7 @@ describe('loginController - HeZi shadow account fallback', () => {
     process.env.HEZI_REQUIRE_INVITE_CODE = 'true';
     mockHasShadowAccount.mockResolvedValue(true);
     mockProvisionShadowAccount.mockResolvedValue({});
+    mockEnsureQuotaRedeemed.mockResolvedValue({ redeemed: false });
     mockRecordProvisioningError.mockResolvedValue({});
     mockSetAuthTokens.mockResolvedValue('local-token');
   });
@@ -103,6 +106,46 @@ describe('loginController - HeZi shadow account fallback', () => {
     expect(mockRecordProvisioningError).toHaveBeenCalledWith({
       userId: '66554433221100ffeeddccbb',
       step: 'login_fallback',
+      error,
+    });
+    expect(mockSetAuthTokens).toHaveBeenCalledWith(req.user._id, res, null, req);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('retries pending quota redemption for existing shadow accounts before issuing auth tokens', async () => {
+    const req = {
+      user: {
+        _id: { toString: () => '66554433221100ffeeddccbb' },
+        email: 'teacher@example.com',
+      },
+    };
+    const res = createRes();
+
+    await loginController(req, res);
+
+    expect(mockEnsureQuotaRedeemed).toHaveBeenCalledWith('66554433221100ffeeddccbb');
+    expect(mockEnsureQuotaRedeemed.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSetAuthTokens.mock.invocationCallOrder[0],
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('records quota redemption retry failures without blocking login', async () => {
+    const error = new Error('quota service unavailable');
+    mockEnsureQuotaRedeemed.mockRejectedValue(error);
+    const req = {
+      user: {
+        _id: { toString: () => '66554433221100ffeeddccbb' },
+        email: 'teacher@example.com',
+      },
+    };
+    const res = createRes();
+
+    await loginController(req, res);
+
+    expect(mockRecordProvisioningError).toHaveBeenCalledWith({
+      userId: '66554433221100ffeeddccbb',
+      step: 'login_quota_redeem',
       error,
     });
     expect(mockSetAuthTokens).toHaveBeenCalledWith(req.user._id, res, null, req);

@@ -497,6 +497,7 @@
   "com_nav_export_recursive_or_sequential": "Recursive or sequential?",
   "com_nav_export_png_hint": "PNG export renders the full conversation as an image, which can take 10–30 seconds for long chats. Please keep this dialog open until the download starts.",
   "com_nav_export_type": "Type",
+  "com_ui_export_png_hint": "PNG generation is slow. Please wait patiently. If download hasn't started within 1 minute, retry once. Do not click repeatedly.",
   "com_nav_external": "External",
   "com_nav_font_size": "Message Font Size",
   "com_nav_font_size_base": "Medium",

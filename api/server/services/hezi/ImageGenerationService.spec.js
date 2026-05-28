@@ -14,6 +14,8 @@ jest.mock('undici', () => ({
 describe('ImageGenerationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.DOMAIN_SERVER;
+    delete process.env.HEZI_IMAGE_PUBLIC_BASE_URL;
   });
 
   it('exposes gpt-image-2 as the default OpenAI model with size schema', () => {
@@ -61,6 +63,8 @@ describe('ImageGenerationService', () => {
   });
 
   it('maps reference image URLs into NewAPI image request payloads', () => {
+    process.env.DOMAIN_SERVER = 'https://hezi.example.com';
+
     expect(
       mapImageRequestPayload({
         provider: 'openai',
@@ -79,7 +83,32 @@ describe('ImageGenerationService', () => {
       n: 1,
       size: '1024x1024',
       quality: 'standard',
-      image_urls: ['/images/user-123/reference.png'],
+      image_urls: ['https://hezi.example.com/images/user-123/reference.png'],
+    });
+  });
+
+  it('uses the dedicated public image base URL when preparing reference images for NewAPI', () => {
+    process.env.DOMAIN_SERVER = 'https://internal.example.com';
+    process.env.HEZI_IMAGE_PUBLIC_BASE_URL = 'https://assets.example.com/';
+
+    expect(
+      mapImageRequestPayload({
+        provider: 'gemini',
+        model: 'gemini-3.1-flash-image-preview',
+        prompt: '保留参考图构图',
+        params: {
+          imageUrls: ['/images/user-123/reference.png', 'https://cdn.example.com/remote.png'],
+        },
+        imageNum: 1,
+      }),
+    ).toEqual({
+      model: 'gemini-3.1-flash-image-preview',
+      prompt: '保留参考图构图',
+      n: 1,
+      image_urls: [
+        'https://assets.example.com/images/user-123/reference.png',
+        'https://cdn.example.com/remote.png',
+      ],
     });
   });
 

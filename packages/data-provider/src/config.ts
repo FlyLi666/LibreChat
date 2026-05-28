@@ -1094,6 +1094,7 @@ export type TStartupConfig = {
   helpAndFaqURL: string;
   customFooter?: string;
   notebookLmUrl?: string;
+  imageGenDefaultModel?: string;
   modelSpecs?: TSpecsConfig;
   modelDescriptions?: Record<string, Record<string, string>>;
   sharedLinksEnabled: boolean;

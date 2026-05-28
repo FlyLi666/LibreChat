@@ -41,6 +41,7 @@ const { sendEmail } = require('~/server/utils');
 const {
   provisionShadowAccount,
   rollbackShadowAccount,
+  recordProvisioningError,
 } = require('~/server/services/hezi/HeziProvisioning');
 const { consumeInviteCode } = require('~/models');
 
@@ -280,9 +281,27 @@ const registerUser = async (user, additionalData = {}) => {
           throw new Error('INVITE_CODE_RACE_LOST');
         }
       } catch (provisionErr) {
-        logger.error('[registerUser] HeZi provisioning failed, rolling back', provisionErr);
         await rollbackShadowAccount(newUserId);
-        throw provisionErr;
+        if (provisionErr?.message === 'INVITE_CODE_RACE_LOST') {
+          logger.error(
+            '[registerUser] HeZi invite-code race lost, rolling back user',
+            provisionErr,
+          );
+          throw provisionErr;
+        }
+        logger.warn(
+          '[registerUser] HeZi provisioning failed; login fallback will retry',
+          provisionErr,
+        );
+        try {
+          await recordProvisioningError({
+            userId: newUserId,
+            step: 'registration',
+            error: provisionErr,
+          });
+        } catch (recordErr) {
+          logger.warn('[registerUser] HeZi provisioning error logging failed', recordErr);
+        }
       }
     }
     // === End HeZi ===

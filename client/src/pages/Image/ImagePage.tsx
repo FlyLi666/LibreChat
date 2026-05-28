@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, ImagePlus, Maximize2, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
 import { v4 } from 'uuid';
 import type {
@@ -19,6 +19,7 @@ import {
   useUpdateImageTopicMutation,
   useUploadImageMutation,
 } from '~/data-provider/Images';
+import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn, triggerDownload } from '~/utils';
 import {
@@ -40,13 +41,41 @@ const schemaLabelFallbacks: Record<string, string> = {
   strength: 'com_image_config_strength',
 };
 
-function groupTopics(topics: TImageTopic[]) {
-  return [
-    { label: '今天', topics },
-    { label: '昨天', topics: [] },
-    { label: '过去 7 天', topics: [] },
-    { label: '更早', topics: [] },
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function getTopicTime(topic: TImageTopic) {
+  const raw = topic.updatedAt || topic.createdAt;
+  const time = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function groupTopics(topics: TImageTopic[]) {
+  const todayStart = startOfLocalDay(new Date());
+  const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+  const sevenDaysStart = todayStart - 6 * 24 * 60 * 60 * 1000;
+  const groups = [
+    { label: '今天', topics: [] as TImageTopic[] },
+    { label: '昨天', topics: [] as TImageTopic[] },
+    { label: '过去 7 天', topics: [] as TImageTopic[] },
+    { label: '更早', topics: [] as TImageTopic[] },
   ];
+
+  for (const topic of topics) {
+    const time = getTopicTime(topic);
+    if (time >= todayStart) {
+      groups[0].topics.push(topic);
+    } else if (time >= yesterdayStart) {
+      groups[1].topics.push(topic);
+    } else if (time >= sevenDaysStart) {
+      groups[2].topics.push(topic);
+    } else {
+      groups[3].topics.push(topic);
+    }
+  }
+
+  return groups;
 }
 
 export function mergeImageBatches(inlineBatches: TImageBatch[], remoteBatches: TImageBatch[]) {
@@ -63,13 +92,16 @@ export function filterDeletedGenerations(
   deletedGenerationIds: ReadonlySet<string>,
 ) {
   return batches
-    .map((batch) => ({
-      ...batch,
-      generations:
-        deletedGenerationIds.size === 0
-          ? batch.generations
-          : batch.generations.filter((generation) => !deletedGenerationIds.has(generation._id)),
-    }))
+    .map((batch) => {
+      const generations = Array.isArray(batch.generations) ? batch.generations : [];
+      return {
+        ...batch,
+        generations:
+          deletedGenerationIds.size === 0
+            ? generations
+            : generations.filter((generation) => !deletedGenerationIds.has(generation._id)),
+      };
+    })
     .filter((batch) => batch.generations.length > 0);
 }
 
@@ -87,6 +119,13 @@ function getImageDownloadFilename(url: string) {
   } catch {
     return 'hezi-image.png';
   }
+}
+
+function supportsReferenceImages(model: TImageModel | undefined) {
+  return (model?.paramSchemas ?? []).some(
+    (schema) =>
+      schema.name === 'imageUrls' && (schema.type === 'image' || schema.type === 'images'),
+  );
 }
 
 function ParamControl({
@@ -393,6 +432,7 @@ function ModelInspector({
   model,
   params,
   referenceFile,
+  supportsReferenceImage,
   onReferenceFileChange,
   onClearReferenceFile,
   onParamChange,
@@ -400,6 +440,7 @@ function ModelInspector({
   model: TImageModel | undefined;
   params: Params;
   referenceFile: File | null;
+  supportsReferenceImage: boolean;
   onReferenceFileChange: (file: File | null) => void;
   onClearReferenceFile: () => void;
   onParamChange: (name: string, value: unknown) => void;
@@ -421,41 +462,44 @@ function ModelInspector({
           />
         ))}
       </div>
-      <div className="mt-5 rounded-lg border border-dashed border-border-medium p-3 text-sm text-text-secondary">
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-text-primary hover:bg-surface-hover">
-          <ImagePlus className="h-4 w-4" />
-          <span>{localize('com_image_reference_image')}</span>
-          <input
-            className="sr-only"
-            type="file"
-            accept="image/*"
-            aria-label={localize('com_image_reference_image')}
-            onChange={(event) => onReferenceFileChange(event.target.files?.[0] ?? null)}
-          />
-        </label>
-        {referenceFile && (
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-surface-primary px-3 py-2">
-            <span className="min-w-0 truncate text-xs text-text-secondary">
-              {referenceFile.name}
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 shrink-0"
-              aria-label={localize('com_image_action_delete')}
-              onClick={onClearReferenceFile}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )}
-      </div>
+      {supportsReferenceImage ? (
+        <div className="mt-5 rounded-lg border border-dashed border-border-medium p-3 text-sm text-text-secondary">
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-text-primary hover:bg-surface-hover">
+            <ImagePlus className="h-4 w-4" />
+            <span>{localize('com_image_reference_image')}</span>
+            <input
+              className="sr-only"
+              type="file"
+              accept="image/*"
+              aria-label={localize('com_image_reference_image')}
+              onChange={(event) => onReferenceFileChange(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          {referenceFile && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-surface-primary px-3 py-2">
+              <span className="min-w-0 truncate text-xs text-text-secondary">
+                {referenceFile.name}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0"
+                aria-label={localize('com_image_action_delete')}
+                onClick={onClearReferenceFile}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : null}
     </aside>
   );
 }
 
 export default function ImagePage() {
   const localize = useLocalize();
+  const { data: startupConfig } = useGetStartupConfig();
   const {
     data: remoteModels,
     isLoading: modelsLoading,
@@ -480,11 +524,14 @@ export default function ImagePage() {
   const deleteTopicMutation = useDeleteImageTopicMutation();
   const localModels = useMemo(() => getLocalImageModels(), []);
   const models = remoteModels?.length ? remoteModels : localModels;
-  const [modelId, setModelId] = useState('gpt-image-2');
+  const configuredDefaultModelId = startupConfig?.imageGenDefaultModel || 'gpt-image-2';
+  const [modelId, setModelId] = useState(configuredDefaultModelId);
+  const hasAppliedConfiguredDefault = useRef(false);
   const model = useMemo(
     () => models.find((item) => item.modelId === modelId) ?? models[0],
     [modelId, models],
   );
+  const supportsReferenceImage = supportsReferenceImages(model);
   const [params, setParams] = useState<Params>(() => getDefaultImageParams(model));
   const [prompt, setPrompt] = useState('');
   const [inlineBatches, setInlineBatches] = useState<TImageBatch[]>([]);
@@ -499,10 +546,26 @@ export default function ImagePage() {
   }, [activeTopicId, topics]);
 
   useEffect(() => {
+    if (hasAppliedConfiguredDefault.current || !startupConfig?.imageGenDefaultModel) {
+      return;
+    }
+    if (models.some((item) => item.modelId === startupConfig.imageGenDefaultModel)) {
+      setModelId(startupConfig.imageGenDefaultModel);
+      hasAppliedConfiguredDefault.current = true;
+    }
+  }, [models, startupConfig?.imageGenDefaultModel]);
+
+  useEffect(() => {
     setParams(getDefaultImageParams(model));
     // `model` may be a fresh object from remote query data; reset only when the selected model changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model?.modelId]);
+
+  useEffect(() => {
+    if (!supportsReferenceImage) {
+      setReferenceFile(null);
+    }
+  }, [supportsReferenceImage]);
 
   const displayedBatches = useMemo(() => {
     return filterDeletedGenerations(
@@ -539,7 +602,7 @@ export default function ImagePage() {
     const imageNum = Number(params.imageNum || 1);
     try {
       const nextParams: Params = { ...params };
-      if (referenceFile) {
+      if (referenceFile && supportsReferenceImage) {
         const formData = new FormData();
         formData.append('endpoint', 'default');
         formData.append('file', referenceFile, encodeURIComponent(referenceFile.name));
@@ -741,6 +804,7 @@ export default function ImagePage() {
         model={model}
         params={params}
         referenceFile={referenceFile}
+        supportsReferenceImage={supportsReferenceImage}
         onReferenceFileChange={setReferenceFile}
         onClearReferenceFile={() => setReferenceFile(null)}
         onParamChange={(name, value) => setParams((prev) => ({ ...prev, [name]: value }))}
