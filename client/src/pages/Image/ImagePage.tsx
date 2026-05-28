@@ -290,44 +290,48 @@ function GenerationCard({
               key={generation._id}
               className="group relative aspect-square overflow-hidden rounded-lg bg-surface-secondary"
             >
-              <div className="bg-surface-primary/90 absolute right-2 top-2 z-10 flex gap-1 rounded-lg p-1 opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+              <div className="bg-surface-primary/90 absolute right-1 top-1 z-10 flex gap-0.5 rounded-lg p-1 opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="size-7"
                   aria-label={localize('com_image_action_zoom')}
                   disabled={!hasImage}
                   onClick={() => imageUrl && setPreview({ url: imageUrl, prompt: batch.prompt })}
                 >
-                  <Maximize2 className="h-4 w-4" />
+                  <Maximize2 className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="size-7"
                   aria-label={localize('com_image_action_download')}
                   disabled={!hasImage}
                   onClick={() =>
                     imageUrl && triggerDownload(imageUrl, getImageDownloadFilename(imageUrl))
                   }
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="size-7"
                   aria-label={localize('com_image_action_recreate')}
                   disabled={generating}
                   onClick={() => onRecreateBatch(batch)}
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="size-7"
                   aria-label={localize('com_image_action_delete')}
                   disabled={deleting}
                   onClick={() => onDeleteGeneration(generation._id)}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
               {generation.status === 'pending' && (
