@@ -212,6 +212,9 @@ const startServer = async () => {
   app.use('/api/assistants', routes.assistants);
   app.use('/api/files', await routes.files.initialize());
   app.use('/images/', createValidateImageRequest(appConfig.secureImageLinks), routes.staticRoute);
+  runAsSystem(() => routes.images.recoverPendingImageGenerationJobs({ appConfig })).catch((err) => {
+    logger.error('[HeZiImageGeneration] Pending image recovery failed:', err);
+  });
   app.use('/api/share', preAuthTenantMiddleware, routes.share);
   app.use('/api/roles', routes.roles);
   app.use('/api/agents', routes.agents);

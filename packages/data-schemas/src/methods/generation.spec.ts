@@ -159,4 +159,72 @@ describe('generation methods', () => {
     const batches = await methods.listGenerationBatches({ userId, topicId: topic._id });
     expect(batches).toHaveLength(0);
   });
+
+  it('lists active pending batches for startup recovery', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const otherUserId = new mongoose.Types.ObjectId();
+    const topic = await methods.createGenerationTopic({ userId, title: '主题', type: 'image' });
+    const otherTopic = await methods.createGenerationTopic({
+      userId: otherUserId,
+      title: '别人',
+      type: 'image',
+    });
+    const pending = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'pending prompt',
+      params: { size: '1024x1024' },
+      imageNum: 1,
+    });
+    await methods.createGenerationBatchWithGenerations({
+      userId: otherUserId,
+      topicId: otherTopic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'other pending prompt',
+      params: {},
+      imageNum: 1,
+    });
+    const completed = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'completed prompt',
+      params: {},
+      imageNum: 1,
+    });
+    await methods.markGenerationSucceeded({
+      userId,
+      generationId: completed.generations[0]._id,
+      asset: { url: '/images/user/completed.png' },
+    });
+    const deleted = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'deleted prompt',
+      params: {},
+      imageNum: 1,
+    });
+    await methods.deleteGenerationBatch({ userId, batchId: deleted.batch._id });
+
+    const batches = await methods.listPendingGenerationBatches({ limit: 10 });
+
+    expect(batches).toHaveLength(2);
+    expect(batches.map((batch) => batch.prompt)).toEqual([
+      'pending prompt',
+      'other pending prompt',
+    ]);
+    expect(batches[0]).toMatchObject({
+      _id: pending.batch._id,
+      userId,
+      topicId: topic._id,
+      prompt: 'pending prompt',
+      generations: [{ _id: pending.generations[0]._id, status: 'pending' }],
+    });
+  });
 });

@@ -192,6 +192,52 @@ export function createGenerationMethods(mongoose: typeof import('mongoose')) {
     })) as IGenerationBatchWithGenerations[];
   }
 
+  async function listPendingGenerationBatches({
+    limit = 25,
+  }: {
+    limit?: number;
+  } = {}): Promise<IGenerationBatchWithGenerations[]> {
+    const batchLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
+    const generationRows = await generations()
+      .find({ status: 'pending', deletedAt: { $exists: false } })
+      .sort({ createdAt: 1, _id: 1 })
+      .limit(batchLimit * 4)
+      .lean<IGeneration[]>();
+
+    const generationsByBatch = new Map<string, IGeneration[]>();
+    const batchIds: ObjectIdLike[] = [];
+    for (const generation of generationRows) {
+      const key = String(generation.batchId);
+      if (!generationsByBatch.has(key)) {
+        generationsByBatch.set(key, []);
+        batchIds.push(generation.batchId);
+      }
+      generationsByBatch.get(key)?.push(generation);
+    }
+    if (batchIds.length === 0) {
+      return [];
+    }
+
+    const batchRows = await batches()
+      .find({ _id: { $in: batchIds }, deletedAt: { $exists: false } })
+      .lean<IGenerationBatch[]>();
+    const batchById = new Map(batchRows.map((batch) => [String(batch._id), batch]));
+
+    return batchIds
+      .map((batchId) => {
+        const batch = batchById.get(String(batchId));
+        if (!batch) {
+          return null;
+        }
+        return {
+          ...batch,
+          generations: generationsByBatch.get(String(batchId)) ?? [],
+        };
+      })
+      .filter(Boolean)
+      .slice(0, batchLimit) as IGenerationBatchWithGenerations[];
+  }
+
   async function markGenerationSucceeded({
     userId,
     generationId,
@@ -274,6 +320,7 @@ export function createGenerationMethods(mongoose: typeof import('mongoose')) {
     deleteGenerationTopic,
     createGenerationBatchWithGenerations,
     listGenerationBatches,
+    listPendingGenerationBatches,
     markGenerationSucceeded,
     markGenerationFailed,
     deleteGenerationBatch,

@@ -10,6 +10,7 @@ const mockDb = {
   getUserKeyValues: jest.fn(),
   getGenerationTopic: jest.fn(),
   listGenerationBatches: jest.fn(),
+  listPendingGenerationBatches: jest.fn(),
   listGenerationTopics: jest.fn(),
   markGenerationFailed: jest.fn(),
   markGenerationSucceeded: jest.fn(),
@@ -48,9 +49,10 @@ function flushBackgroundJobs() {
 
 describe('image generation routes', () => {
   let app;
+  let imagesRouter;
 
   beforeAll(() => {
-    const imagesRouter = require('../images');
+    imagesRouter = require('../images');
 
     app = express();
     app.use(express.json());
@@ -63,6 +65,7 @@ describe('image generation routes', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    imagesRouter._resetImageGenerationQueueForTests?.();
     mockImageService.getImageModel.mockReturnValue({
       provider: 'openai',
       modelId: 'gpt-image-2',
@@ -348,6 +351,50 @@ describe('image generation routes', () => {
     expect(mockDb.deleteGenerationBatch).toHaveBeenCalledWith({
       userId: 'user-123',
       batchId: 'batch-1',
+    });
+  });
+
+  it('recovers pending image batches for startup durable delivery', async () => {
+    mockDb.listPendingGenerationBatches.mockResolvedValue([
+      {
+        _id: 'batch-pending',
+        userId: 'user-123',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: 'recover pending image',
+        params: { size: '1024x1024' },
+        generations: [{ _id: 'generation-1', status: 'pending' }],
+      },
+    ]);
+    mockImageService.runImageGeneration.mockResolvedValue([
+      { url: 'https://cdn.example.com/recovered.png' },
+    ]);
+    mockDb.markGenerationSucceeded.mockResolvedValue({
+      _id: 'generation-1',
+      status: 'succeeded',
+      asset: { url: 'https://cdn.example.com/recovered.png' },
+    });
+
+    await imagesRouter.recoverPendingImageGenerationJobs({ appConfig: mockAppConfig });
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
+
+    expect(mockDb.listPendingGenerationBatches).toHaveBeenCalledWith({ limit: 25 });
+    expect(mockImageService.runImageGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-123',
+        model: 'gpt-image-2',
+        prompt: 'recover pending image',
+        params: { size: '1024x1024' },
+        imageNum: 1,
+      }),
+    );
+    expect(mockDb.markGenerationSucceeded).toHaveBeenCalledWith({
+      userId: 'user-123',
+      generationId: 'generation-1',
+      asset: { url: 'https://cdn.example.com/recovered.png' },
+      fileId: undefined,
     });
   });
 });

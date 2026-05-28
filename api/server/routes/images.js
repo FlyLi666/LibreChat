@@ -10,6 +10,7 @@ const {
 const { persistGeneratedImageAsset } = require('~/server/services/hezi/ImageAssetStorage');
 
 const router = express.Router();
+const queuedImageBatchIds = new Set();
 
 router.use(requireJwtAuth);
 router.use(configMiddleware);
@@ -34,6 +35,21 @@ function getJobRequest(req) {
   return {
     config: req.config,
     user: req.user,
+  };
+}
+
+function getJobBatchId({ created }) {
+  return created?.batch?._id ? String(created.batch._id) : null;
+}
+
+function getRecoveryJobRequest({ appConfig, batch }) {
+  return {
+    config: appConfig,
+    user: {
+      id: String(batch.userId),
+      _id: batch.userId,
+      tenantId: batch.tenantId,
+    },
   };
 }
 
@@ -93,11 +109,60 @@ async function runImageGenerationJob({
 }
 
 function queueImageGenerationJob(params) {
-  setImmediate(() => {
-    runImageGenerationJob(params).catch((error) => {
+  const batchId = getJobBatchId(params);
+  if (batchId && queuedImageBatchIds.has(batchId)) {
+    return false;
+  }
+  if (batchId) {
+    queuedImageBatchIds.add(batchId);
+  }
+  setImmediate(async () => {
+    try {
+      await runImageGenerationJob(params);
+    } catch (error) {
       logger.error('[HeZiImageGeneration] background job failed', error);
-    });
+    } finally {
+      if (batchId) {
+        queuedImageBatchIds.delete(batchId);
+      }
+    }
   });
+  return true;
+}
+
+async function recoverPendingImageGenerationJobs({ appConfig, limit = 25 } = {}) {
+  const pendingBatches = await db.listPendingGenerationBatches({ limit });
+  let queued = 0;
+  for (const batch of pendingBatches) {
+    const generations = (batch.generations || []).filter(
+      (generation) => generation.status === 'pending',
+    );
+    if (generations.length === 0) {
+      continue;
+    }
+    const didQueue = queueImageGenerationJob({
+      req: getRecoveryJobRequest({ appConfig, batch }),
+      userId: batch.userId,
+      topic: batch.topicId ? { _id: batch.topicId } : null,
+      topicId: batch.topicId,
+      created: {
+        batch,
+        generations,
+      },
+      provider: batch.provider,
+      model: batch.model,
+      prompt: batch.prompt,
+      params: batch.params || {},
+      imageNum: generations.length,
+    });
+    if (didQueue) {
+      queued++;
+    }
+  }
+  if (queued > 0) {
+    logger.info(`[HeZiImageGeneration] recovered ${queued} pending image batch(es)`);
+  }
+  return { found: pendingBatches.length, queued };
 }
 
 router.get('/models', (_req, res) => {
@@ -210,5 +275,8 @@ router.post('/generate', async (req, res) => {
     batch: serializeBatch(created.batch, created.generations),
   });
 });
+
+router.recoverPendingImageGenerationJobs = recoverPendingImageGenerationJobs;
+router._resetImageGenerationQueueForTests = () => queuedImageBatchIds.clear();
 
 module.exports = router;
