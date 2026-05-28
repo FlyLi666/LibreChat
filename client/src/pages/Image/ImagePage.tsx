@@ -43,6 +43,15 @@ function groupTopics(topics: TImageTopic[]) {
   ];
 }
 
+export function mergeImageBatches(inlineBatches: TImageBatch[], remoteBatches: TImageBatch[]) {
+  const remoteById = new Map(remoteBatches.map((batch) => [batch._id, batch]));
+  const inlineIds = new Set(inlineBatches.map((batch) => batch._id));
+  return [
+    ...inlineBatches.map((batch) => remoteById.get(batch._id) ?? batch),
+    ...remoteBatches.filter((batch) => !inlineIds.has(batch._id)),
+  ];
+}
+
 function getSchemaLabel(schema: TImageParamSchema, localize: ReturnType<typeof useLocalize>) {
   const key =
     schema.i18nLabel || schemaLabelFallbacks[schema.name] || `com_image_config_${schema.name}`;
@@ -253,7 +262,7 @@ export default function ImagePage() {
     data: batches = [],
     isLoading: batchesLoading,
     isError: batchesError,
-  } = useImageBatchesQuery(activeTopicId);
+  } = useImageBatchesQuery(activeTopicId, { refetchInterval: activeTopicId ? 3000 : false });
   const generateMutation = useGenerateImageMutation();
   const localModels = useMemo(() => getLocalImageModels(), []);
   const models = remoteModels?.length ? remoteModels : localModels;
@@ -279,8 +288,7 @@ export default function ImagePage() {
   }, [model?.modelId]);
 
   const displayedBatches = useMemo(() => {
-    const inlineIds = new Set(inlineBatches.map((batch) => batch._id));
-    return [...inlineBatches, ...batches.filter((batch) => !inlineIds.has(batch._id))];
+    return mergeImageBatches(inlineBatches, batches);
   }, [batches, inlineBatches]);
 
   const upsertInlineBatch = (batch: TImageBatch | undefined) => {

@@ -2,7 +2,7 @@ import React from 'react';
 import '@testing-library/jest-dom/extend-expect';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import ImagePage from '../ImagePage';
+import ImagePage, { mergeImageBatches } from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
 let mockBatchesLoading = false;
@@ -82,6 +82,29 @@ describe('ImagePage', () => {
     expect(screen.getAllByText('尺寸').length).toBeGreaterThan(0);
     expect(screen.getAllByText('质量').length).toBeGreaterThan(0);
     expect(screen.getAllByText('数量').length).toBeGreaterThan(0);
+  });
+
+  it('prefers refreshed remote batches over matching inline pending batches', () => {
+    const pendingBatch = {
+      _id: 'batch-1',
+      prompt: '画一只穿宇航服的猫',
+      model: 'gpt-image-2',
+      generations: [{ _id: 'generation-1', status: 'pending' }],
+    };
+    const succeededBatch = {
+      _id: 'batch-1',
+      prompt: '画一只穿宇航服的猫',
+      model: 'gpt-image-2',
+      generations: [
+        {
+          _id: 'generation-1',
+          status: 'succeeded',
+          asset: { url: '/images/user-123/cat.png' },
+        },
+      ],
+    };
+
+    expect(mergeImageBatches([pendingBatch], [succeededBatch])).toEqual([succeededBatch]);
   });
 
   it('shows the empty state when no topic is selected and the batches query is disabled', () => {

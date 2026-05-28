@@ -21,6 +21,9 @@ const mockImageService = {
   getImageModels: jest.fn(),
   runImageGeneration: jest.fn(),
 };
+const mockImageAssetStorage = {
+  persistGeneratedImageAsset: jest.fn(),
+};
 
 jest.mock('~/models', () => mockDb);
 
@@ -29,6 +32,11 @@ jest.mock('~/server/middleware', () => ({
 }));
 
 jest.mock('~/server/services/hezi/ImageGenerationService', () => mockImageService);
+jest.mock('~/server/services/hezi/ImageAssetStorage', () => mockImageAssetStorage);
+
+function flushBackgroundJobs() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
 
 describe('image generation routes', () => {
   let app;
@@ -55,6 +63,10 @@ describe('image generation routes', () => {
     mockImageService.getImageModels.mockReturnValue([
       { provider: 'openai', modelId: 'gpt-image-2', disabled: false },
     ]);
+    mockImageAssetStorage.persistGeneratedImageAsset.mockImplementation(async ({ image }) => ({
+      asset: image,
+      fileId: undefined,
+    }));
     mockDb.getGenerationTopic.mockResolvedValue({ _id: '507f1f77bcf86cd799439011' });
   });
 
@@ -68,11 +80,11 @@ describe('image generation routes', () => {
     expect(mockImageService.getImageModels).toHaveBeenCalledTimes(1);
   });
 
-  it('creates a topic and returns succeeded generations', async () => {
+  it('creates a topic, returns pending generations, and completes in the background', async () => {
     mockDb.createGenerationTopic.mockResolvedValue({ _id: 'topic-1', title: '画一只穿宇航服的猫' });
     mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
       batch: { _id: 'batch-1', prompt: '画一只穿宇航服的猫' },
-      generations: [{ _id: 'generation-1' }],
+      generations: [{ _id: 'generation-1', status: 'pending' }],
     });
     mockImageService.runImageGeneration.mockResolvedValue([
       { url: 'https://cdn.example.com/cat.png' },
@@ -115,19 +127,63 @@ describe('image generation routes', () => {
         getUserKeyValues: mockDb.getUserKeyValues,
       }),
     );
-    expect(response.body.batch.generations).toEqual([
-      {
-        _id: 'generation-1',
-        status: 'succeeded',
-        asset: { url: 'https://cdn.example.com/cat.png' },
-      },
-    ]);
+    expect(response.body.batch.generations).toEqual([{ _id: 'generation-1', status: 'pending' }]);
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
+    expect(mockImageAssetStorage.persistGeneratedImageAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image: { url: 'https://cdn.example.com/cat.png' },
+        generationId: 'generation-1',
+      }),
+    );
+    expect(mockDb.markGenerationSucceeded).toHaveBeenCalledWith({
+      userId: 'user-123',
+      generationId: 'generation-1',
+      asset: { url: 'https://cdn.example.com/cat.png' },
+      fileId: undefined,
+    });
   });
 
-  it('marks rows failed when image generation fails', async () => {
+  it('returns pending generations before upstream image generation finishes', async () => {
+    mockDb.createGenerationTopic.mockResolvedValue({ _id: 'topic-1', title: '画一只穿宇航服的猫' });
+    mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
+      batch: { _id: 'batch-1', prompt: '画一只穿宇航服的猫' },
+      generations: [{ _id: 'generation-1', status: 'pending' }],
+    });
+    let resolveImages;
+    mockImageService.runImageGeneration.mockReturnValue(
+      new Promise((resolve) => {
+        resolveImages = resolve;
+      }),
+    );
+
+    const responsePromise = request(app)
+      .post('/api/images/generate')
+      .send({
+        model: 'gpt-image-2',
+        prompt: '画一只穿宇航服的猫',
+        params: { size: '1024x1024' },
+        imageNum: 1,
+      });
+
+    const response = await Promise.race([
+      responsePromise,
+      new Promise((resolve) => setTimeout(() => resolve(null), 50)),
+    ]);
+
+    expect(response).not.toBeNull();
+    expect(response.status).toBe(200);
+    expect(response.body.batch.generations).toEqual([{ _id: 'generation-1', status: 'pending' }]);
+    expect(mockDb.markGenerationSucceeded).not.toHaveBeenCalled();
+    resolveImages([{ url: 'https://cdn.example.com/cat.png' }]);
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
+  });
+
+  it('marks rows failed in the background when image generation fails', async () => {
     mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
       batch: { _id: 'batch-1', prompt: 'prompt' },
-      generations: [{ _id: 'generation-1' }],
+      generations: [{ _id: 'generation-1', status: 'pending' }],
     });
     mockImageService.runImageGeneration.mockRejectedValue(new Error('upstream timeout'));
     mockDb.markGenerationFailed.mockResolvedValue({
@@ -142,13 +198,55 @@ describe('image generation routes', () => {
       prompt: 'prompt',
     });
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(200);
+    expect(response.body.batch.generations).toEqual([{ _id: 'generation-1', status: 'pending' }]);
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
     expect(mockDb.markGenerationFailed).toHaveBeenCalledWith({
       userId: 'user-123',
       generationId: 'generation-1',
       error: 'upstream timeout',
     });
-    expect(response.body.error).toBe('当前模型暂不可用，请换一个');
+  });
+
+  it('persists base64 image assets before marking generations succeeded', async () => {
+    mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
+      batch: { _id: 'batch-1', prompt: 'prompt' },
+      generations: [{ _id: 'generation-1', status: 'pending' }],
+    });
+    mockImageService.runImageGeneration.mockResolvedValue([
+      { b64: 'abc123', mimeType: 'image/png' },
+    ]);
+    mockImageAssetStorage.persistGeneratedImageAsset.mockResolvedValue({
+      asset: { url: '/images/user-123/hezi-image-generation-1.png', mimeType: 'image/png' },
+      fileId: 'file-1',
+    });
+    mockDb.markGenerationSucceeded.mockResolvedValue({
+      _id: 'generation-1',
+      status: 'succeeded',
+    });
+
+    const response = await request(app).post('/api/images/generate').send({
+      topicId: '507f1f77bcf86cd799439011',
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+    });
+
+    expect(response.status).toBe(200);
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
+    expect(mockImageAssetStorage.persistGeneratedImageAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image: { b64: 'abc123', mimeType: 'image/png' },
+        generationId: 'generation-1',
+      }),
+    );
+    expect(mockDb.markGenerationSucceeded).toHaveBeenCalledWith({
+      userId: 'user-123',
+      generationId: 'generation-1',
+      asset: { url: '/images/user-123/hezi-image-generation-1.png', mimeType: 'image/png' },
+      fileId: 'file-1',
+    });
   });
 
   it('rejects malformed topic ids before creating rows', async () => {

@@ -7,6 +7,7 @@ const {
   getImageModel,
   runImageGeneration,
 } = require('~/server/services/hezi/ImageGenerationService');
+const { persistGeneratedImageAsset } = require('~/server/services/hezi/ImageAssetStorage');
 
 const router = express.Router();
 
@@ -26,6 +27,76 @@ function serializeBatch(batch, generations) {
     ...batch,
     generations,
   };
+}
+
+function getJobRequest(req) {
+  return {
+    config: req.config,
+    user: req.user,
+  };
+}
+
+async function runImageGenerationJob({
+  req,
+  userId,
+  topic,
+  topicId,
+  created,
+  provider,
+  model,
+  prompt,
+  params,
+  imageNum,
+}) {
+  try {
+    const images = await runImageGeneration({
+      userId,
+      provider,
+      model,
+      prompt,
+      params,
+      imageNum,
+      getUserKeyValues: db.getUserKeyValues,
+    });
+    const updated = [];
+    for (let i = 0; i < created.generations.length; i++) {
+      const image = images[i] || images[0];
+      const { asset, fileId } = await persistGeneratedImageAsset({
+        req,
+        image,
+        generationId: created.generations[i]._id,
+      });
+      const generation = await db.markGenerationSucceeded({
+        userId,
+        generationId: created.generations[i]._id,
+        asset,
+        fileId,
+      });
+      if (generation) {
+        updated.push(generation);
+      }
+    }
+    if (topic && updated[0]?.asset?.url) {
+      await db.updateGenerationTopic({ userId, topicId, coverUrl: updated[0].asset.url });
+    }
+  } catch (error) {
+    logger.error('[HeZiImageGeneration] generate failed', error);
+    for (const generation of created.generations) {
+      await db.markGenerationFailed({
+        userId,
+        generationId: generation._id,
+        error: error.message || '当前模型暂不可用',
+      });
+    }
+  }
+}
+
+function queueImageGenerationJob(params) {
+  setImmediate(() => {
+    runImageGenerationJob(params).catch((error) => {
+      logger.error('[HeZiImageGeneration] background job failed', error);
+    });
+  });
 }
 
 router.get('/models', (_req, res) => {
@@ -120,60 +191,23 @@ router.post('/generate', async (req, res) => {
     imageNum,
   });
 
-  try {
-    const images = await runImageGeneration({
-      userId,
-      provider,
-      model,
-      prompt,
-      params,
-      imageNum,
-      getUserKeyValues: db.getUserKeyValues,
-    });
-    const updated = [];
-    for (let i = 0; i < created.generations.length; i++) {
-      const image = images[i] || images[0];
-      const asset = image.url
-        ? image
-        : {
-            url: `data:${image.mimeType || 'image/png'};base64,${image.b64}`,
-            mimeType: image.mimeType || 'image/png',
-          };
-      const generation = await db.markGenerationSucceeded({
-        userId,
-        generationId: created.generations[i]._id,
-        asset,
-      });
-      if (generation) {
-        updated.push(generation);
-      }
-    }
-    if (topic && updated[0]?.asset?.url) {
-      await db.updateGenerationTopic({ userId, topicId, coverUrl: updated[0].asset.url });
-    }
-    return res.json({
-      topic,
-      batch: serializeBatch(created.batch, updated),
-    });
-  } catch (error) {
-    logger.error('[HeZiImageGeneration] generate failed', error);
-    const failed = [];
-    for (const generation of created.generations) {
-      const row = await db.markGenerationFailed({
-        userId,
-        generationId: generation._id,
-        error: error.message || '当前模型暂不可用',
-      });
-      if (row) {
-        failed.push(row);
-      }
-    }
-    return res.status(502).json({
-      topic,
-      batch: serializeBatch(created.batch, failed),
-      error: '当前模型暂不可用，请换一个',
-    });
-  }
+  queueImageGenerationJob({
+    req: getJobRequest(req),
+    userId,
+    topic,
+    topicId,
+    created,
+    provider,
+    model,
+    prompt,
+    params,
+    imageNum,
+  });
+
+  return res.json({
+    topic,
+    batch: serializeBatch(created.batch, created.generations),
+  });
 });
 
 module.exports = router;
