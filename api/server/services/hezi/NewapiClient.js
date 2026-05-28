@@ -186,6 +186,44 @@ function extractTokenKey(body, preferredName) {
   return items.find((item) => item?.key?.startsWith?.('sk-'))?.key || null;
 }
 
+function extractTokenItem(body, preferredName) {
+  const data = body?.data;
+  let items = [];
+  if (Array.isArray(data?.items)) {
+    items = data.items;
+  } else if (Array.isArray(data)) {
+    items = data;
+  }
+  if (!items.length) {
+    return null;
+  }
+  return items.find((item) => item?.name === preferredName) || items[0] || null;
+}
+
+async function getUserTokenKey({ cookie, userId, tokenId }) {
+  const res = await fetch(`${BASE}/api/token/${tokenId}/key`, {
+    method: 'POST',
+    headers: userHeaders(cookie, userId),
+  });
+  const { body, raw } = await readJsonOrText(res);
+  if (!res.ok || !body?.success) {
+    throw new NewapiError('getUserTokenKey failed after create', {
+      status: res.status,
+      body: body || raw,
+      code: 'GET_TOKEN_KEY_FAILED',
+    });
+  }
+  const key = body?.data?.key;
+  if (typeof key === 'string' && key.startsWith('sk-')) {
+    return key;
+  }
+  throw new NewapiError('getUserTokenKey returned no sk- key', {
+    status: res.status,
+    body,
+    code: 'GET_TOKEN_KEY_NO_KEY',
+  });
+}
+
 async function listUserTokens({ cookie, userId, name }) {
   const res = await fetch(`${BASE}/api/token/?p=0&page_size=10`, {
     headers: userHeaders(cookie, userId),
@@ -198,7 +236,15 @@ async function listUserTokens({ cookie, userId, name }) {
       code: 'LIST_TOKENS_FAILED',
     });
   }
-  return extractTokenKey(body, name);
+  const key = extractTokenKey(body, name);
+  if (key) {
+    return key;
+  }
+  const token = extractTokenItem(body, name);
+  if (!token?.id) {
+    return null;
+  }
+  return getUserTokenKey({ cookie, userId, tokenId: token.id });
 }
 
 /**
