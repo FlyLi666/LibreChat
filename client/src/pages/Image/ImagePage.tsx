@@ -296,6 +296,11 @@ export default function ImagePage() {
     setPrompt('');
   };
 
+  const hasActiveTopic = !!activeTopicId;
+  const selectingInitialTopic = !activeTopicId && topics.length > 0;
+  const isLoadingBatches = hasActiveTopic && batchesLoading;
+  const hasBatchesError = hasActiveTopic && batchesError;
+
   const submit = async () => {
     const trimmed = prompt.trim();
     if (!trimmed || !model) {
@@ -327,7 +332,7 @@ export default function ImagePage() {
   };
 
   const renderWorkspace = () => {
-    if (modelsLoading || topicsLoading || batchesLoading) {
+    if (modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches) {
       return (
         <div className="flex h-full min-h-[420px] items-center justify-center text-sm text-text-secondary">
           {localize('com_image_generating')}
@@ -335,7 +340,7 @@ export default function ImagePage() {
       );
     }
 
-    if (modelsError || topicsError || batchesError) {
+    if (modelsError || topicsError || hasBatchesError) {
       return (
         <div className="flex h-full min-h-[420px] items-center justify-center px-4 text-center text-sm text-red-600">
           {localize('com_image_error_no_channel')}

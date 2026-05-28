@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ImagePage from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
+let mockBatchesLoading = false;
 
 jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) =>
@@ -49,7 +50,7 @@ jest.mock('~/data-provider/Images', () => ({
     ],
   }),
   useImageTopicsQuery: () => ({ data: [] }),
-  useImageBatchesQuery: () => ({ data: [] }),
+  useImageBatchesQuery: () => ({ data: [], isLoading: mockBatchesLoading }),
   useGenerateImageMutation: () => ({
     mutateAsync: mockGenerateImage,
     isLoading: false,
@@ -70,6 +71,7 @@ describe('ImagePage', () => {
   beforeEach(() => {
     mockGenerateImage.mockReset();
     mockGenerateImage.mockResolvedValue({});
+    mockBatchesLoading = false;
   });
 
   it('renders the empty state and default gpt-image-2 controls', () => {
@@ -80,6 +82,15 @@ describe('ImagePage', () => {
     expect(screen.getAllByText('尺寸').length).toBeGreaterThan(0);
     expect(screen.getAllByText('质量').length).toBeGreaterThan(0);
     expect(screen.getAllByText('数量').length).toBeGreaterThan(0);
+  });
+
+  it('shows the empty state when no topic is selected and the batches query is disabled', () => {
+    mockBatchesLoading = true;
+
+    renderPage();
+
+    expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+    expect(screen.queryByText('生成中...')).not.toBeInTheDocument();
   });
 
   it('adapts parameter controls when switching models', () => {
