@@ -1,0 +1,25 @@
+.stream {
+  display: contents;
+}
+
+.stream :global(.hezi-stream-char) {
+  animation: hezi-stream-fade 280ms cubic-bezier(0.33, 0, 0.67, 1);
+  display: inline;
+  will-change: opacity;
+}
+
+@keyframes hezi-stream-fade {
+  from {
+    opacity: 0.2;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream :global(.hezi-stream-char) {
+    animation: none;
+  }
+}

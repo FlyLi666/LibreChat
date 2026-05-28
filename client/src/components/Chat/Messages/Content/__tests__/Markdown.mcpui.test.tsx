@@ -11,6 +11,22 @@ import {
 import { useGetMessagesByConvoId } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 
+jest.mock(
+  '@librechat/client',
+  () => ({
+    Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+    useToastContext: () => ({ showToast: jest.fn() }),
+  }),
+  { virtual: true },
+);
+
+jest.mock('~/components/Messages/Content/CodeBlock', () => ({
+  __esModule: true,
+  default: ({ codeChildren, lang }: any) => (
+    <code className={`language-${lang}`}>{codeChildren}</code>
+  ),
+}));
+
 // Mocks for hooks used by MCPUIResource when rendered inside Markdown.
 // Keep Provider components intact while mocking only the hooks we use.
 jest.mock('~/Providers', () => ({
@@ -106,5 +122,30 @@ describe('Markdown with MCP UI markers (resource IDs)', () => {
     expect(renderers).toHaveLength(2);
     expect(renderers[0]).toHaveAttribute('data-resource-uri', 'ui://weather/paris');
     expect(renderers[1]).toHaveAttribute('data-resource-uri', 'ui://weather/nyc');
+  });
+
+  it('skips rehype highlight while streaming', () => {
+    mockUseMessageContext.mockReturnValue({ messageId: 'msg-code' } as any);
+    const content = ['```ts', 'const value = 1;', '```'].join('\n');
+
+    const { container } = render(
+      <RecoilRoot>
+        <Markdown content={content} isLatestMessage={true} isStreaming={true} />
+      </RecoilRoot>,
+    );
+
+    expect(container.querySelector('.hljs')).not.toBeInTheDocument();
+  });
+
+  it('wraps streamable text characters for fade animation while streaming', () => {
+    mockUseMessageContext.mockReturnValue({ messageId: 'msg-stream-text' } as any);
+
+    const { container } = render(
+      <RecoilRoot>
+        <Markdown content="abc" isLatestMessage={true} isStreaming={true} />
+      </RecoilRoot>,
+    );
+
+    expect(container.querySelectorAll('.hezi-stream-char')).toHaveLength(3);
   });
 });

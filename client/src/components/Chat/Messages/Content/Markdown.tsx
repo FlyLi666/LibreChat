@@ -20,14 +20,20 @@ import MarkdownErrorBoundary from './MarkdownErrorBoundary';
 import { langSubset, preprocessLaTeX } from '~/utils';
 import { unicodeCitation } from '~/components/Web';
 import { code, a, p, img } from './MarkdownComponents';
+import { rehypeStreamAnimated } from './SmoothStream/rehypeStreamAnimated';
 import store from '~/store';
 
 type TContentProps = {
   content: string;
   isLatestMessage: boolean;
+  isStreaming?: boolean;
 };
 
-const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TContentProps) {
+const Markdown = memo(function Markdown({
+  content = '',
+  isLatestMessage,
+  isStreaming = false,
+}: TContentProps) {
   const LaTeXParsing = useRecoilValue<boolean>(store.LaTeXParsing);
   const isInitializing = content === '';
 
@@ -39,29 +45,35 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
   }, [content, LaTeXParsing, isInitializing]);
 
   const rehypePlugins = useMemo(
+    () =>
+      isStreaming
+        ? [[rehypeKatex], rehypeStreamAnimated]
+        : [
+            [rehypeKatex],
+            [
+              rehypeHighlight,
+              {
+                detect: true,
+                ignoreMissing: true,
+                subset: langSubset,
+              },
+            ],
+          ],
+    [isStreaming],
+  );
+
+  const remarkPlugins: Pluggable[] = useMemo(
     () => [
-      [rehypeKatex],
-      [
-        rehypeHighlight,
-        {
-          detect: true,
-          ignoreMissing: true,
-          subset: langSubset,
-        },
-      ],
+      supersub,
+      remarkGfm,
+      remarkDirective,
+      artifactPlugin,
+      [remarkMath, { singleDollarTextMath: false }],
+      unicodeCitation,
+      mcpUIResourcePlugin,
     ],
     [],
   );
-
-  const remarkPlugins: Pluggable[] = [
-    supersub,
-    remarkGfm,
-    remarkDirective,
-    artifactPlugin,
-    [remarkMath, { singleDollarTextMath: false }],
-    unicodeCitation,
-    mcpUIResourcePlugin,
-  ];
 
   if (isInitializing) {
     return (

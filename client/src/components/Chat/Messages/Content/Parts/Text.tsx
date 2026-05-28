@@ -2,6 +2,7 @@ import { memo, useMemo, ReactElement } from 'react';
 import { useRecoilValue } from 'recoil';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
 import Markdown from '~/components/Chat/Messages/Content/Markdown';
+import SmoothStream from '~/components/Chat/Messages/Content/SmoothStream';
 import { useMessageContext } from '~/Providers';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -24,13 +25,16 @@ const TextPart = memo(function TextPart({ text, isCreatedByUser, showCursor }: T
 
   const content: ContentType = useMemo(() => {
     if (!isCreatedByUser) {
+      if (isLatestMessage && isSubmitting) {
+        return <SmoothStream text={text} isLatestMessage={isLatestMessage} isStreaming={true} />;
+      }
       return <Markdown content={text} isLatestMessage={isLatestMessage} />;
     } else if (enableUserMsgMarkdown) {
       return <MarkdownLite content={text} />;
     } else {
       return <>{text}</>;
     }
-  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
+  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage, isSubmitting]);
 
   return (
     <div

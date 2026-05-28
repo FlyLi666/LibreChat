@@ -8,6 +8,7 @@ import { useMessageContext } from '~/Providers';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
+import SmoothStream from './SmoothStream';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 import Markdown from './Markdown';
@@ -102,13 +103,16 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
 
   const content = useMemo(() => {
     if (!isCreatedByUser) {
+      if (isLatestMessage && isSubmitting) {
+        return <SmoothStream text={text} isLatestMessage={isLatestMessage} isStreaming={true} />;
+      }
       return <Markdown content={text} isLatestMessage={isLatestMessage} />;
     }
     if (enableUserMsgMarkdown) {
       return <MarkdownLite content={text} />;
     }
     return <>{text}</>;
-  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
+  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage, isSubmitting]);
 
   return (
     <Container message={message}>
