@@ -10,6 +10,8 @@
  *   6. Optionally redeem the inviteCode-bound quotaCode (best-effort)
  *   7. Encrypt password + token + numeric id with encryptV3
  *      → store as PluginAuth rows under pluginKey 'newapi-shadow'
+ *   8. Store the token as the user's "HeZi newAPI" custom endpoint key
+ *      so chat calls use the shadow account, not the global gateway key.
  *
  * Failure semantics:
  *   - Steps 1-5 are atomic-ish: if any fails, throw → caller rolls back the LibreChat user.
@@ -27,9 +29,16 @@ const {
   createUserToken,
   redeemQuotaCode,
 } = require('./NewapiClient');
-const { updatePluginAuth, deletePluginAuth, findOnePluginAuth } = require('~/models');
+const {
+  updatePluginAuth,
+  updateUserKey,
+  deleteUserKey,
+  deletePluginAuth,
+  findOnePluginAuth,
+} = require('~/models');
 
 const PLUGIN_KEY = 'newapi-shadow';
+const HEZI_ENDPOINT_NAME = 'HeZi newAPI';
 
 async function storeShadow(userId, fields) {
   for (const [authField, value] of Object.entries(fields)) {
@@ -41,6 +50,23 @@ async function storeShadow(userId, fields) {
       value: encryptV3(String(value)),
     });
   }
+}
+
+function getNewapiV1BaseUrl() {
+  const base = (process.env.HEZI_NEWAPI_BASE_URL || 'https://newapi.flyli.cn').replace(/\/+$/, '');
+  return base.endsWith('/v1') ? base : `${base}/v1`;
+}
+
+async function storeEndpointKey(userId, sk) {
+  await updateUserKey({
+    userId: String(userId),
+    name: HEZI_ENDPOINT_NAME,
+    value: JSON.stringify({
+      apiKey: sk,
+      baseURL: getNewapiV1BaseUrl(),
+    }),
+    expiresAt: null,
+  });
 }
 
 /**
@@ -119,6 +145,7 @@ async function provisionShadowAccount({ user, quotaCode }) {
     quota_redeemed: redeemed ? '1' : '0',
     quota_code: quotaCode || '',
   });
+  await storeEndpointKey(userId, sk);
 
   logger.info(
     `[HeziProvisioning] provisioned ${username} (newapiId=${newapiUserId}, redeemed=${redeemed})`,
@@ -140,6 +167,7 @@ async function hasShadowAccount(userId) {
 async function rollbackShadowAccount(userId) {
   try {
     await deletePluginAuth({ userId: String(userId), pluginKey: PLUGIN_KEY, all: true });
+    await deleteUserKey({ userId: String(userId), name: HEZI_ENDPOINT_NAME });
   } catch (err) {
     logger.warn('[HeziProvisioning] rollback delete failed', err);
   }
@@ -153,4 +181,5 @@ module.exports = {
   hasShadowAccount,
   rollbackShadowAccount,
   PLUGIN_KEY,
+  HEZI_ENDPOINT_NAME,
 };
