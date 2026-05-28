@@ -5,7 +5,7 @@ function sanitizeRedemptionNamePart(value) {
     String(value || 'seed')
       .replace(/[^A-Za-z0-9_-]+/g, '_')
       .replace(/^_+|_+$/g, '')
-      .slice(0, 48) || 'seed'
+      .slice(0, 6) || 'seed'
   );
 }
 
@@ -24,7 +24,7 @@ async function createInviteQuotaCodes({
     return [];
   }
   const codes = await createRedemptionCodes({
-    name: `hezi_invite_${sanitizeRedemptionNamePart(note)}_${timestamp}`,
+    name: `hezi_${sanitizeRedemptionNamePart(note)}_${String(timestamp).slice(0, 8)}`,
     quota: numericQuota,
     count,
   });

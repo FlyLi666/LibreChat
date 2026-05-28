@@ -23,7 +23,7 @@ describe('InviteSeeder', () => {
     });
 
     expect(createRedemptionCodes).toHaveBeenCalledWith({
-      name: 'hezi_invite_launch_1779939600000',
+      name: 'hezi_launch_17799396',
       quota: 2500000,
       count: 2,
     });
