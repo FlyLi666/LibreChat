@@ -2,6 +2,7 @@ import React from 'react';
 
 jest.mock('~/components/Auth', () => ({
   Login: () => null,
+  RequireAdmin: ({ children }: { children: React.ReactNode }) => children,
   VerifyEmail: () => null,
   Registration: () => null,
   ResetPassword: () => null,
@@ -66,5 +67,11 @@ describe('skills routes', () => {
     const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
 
     expect(paths).toContain('skills/new');
+  });
+
+  it('registers the NotebookLM route', () => {
+    const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
+
+    expect(paths).toContain('notebook');
   });
 });

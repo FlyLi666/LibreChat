@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import {
   Login,
+  RequireAdmin,
   VerifyEmail,
   Registration,
   ResetPassword,
@@ -35,6 +36,11 @@ const loadInlinePromptsView = () =>
 
 const loadSkillsView = () =>
   import('~/components/Skills/layouts/SkillsView').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadNotebookPage = () =>
+  import('~/pages/Notebook').then((m) => ({
     Component: m.default,
   }));
 
@@ -120,6 +126,20 @@ export const router = createBrowserRouter(
             {
               path: 'search',
               element: <Search />,
+            },
+            {
+              path: 'notebook',
+              element: (
+                <RequireAdmin>
+                  <Outlet />
+                </RequireAdmin>
+              ),
+              children: [
+                {
+                  index: true,
+                  lazy: loadNotebookPage,
+                },
+              ],
             },
             {
               path: 'prompts',

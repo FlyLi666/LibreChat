@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
+import { useNavigate } from 'react-router-dom';
 import { MessagesSquare } from 'lucide-react';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
@@ -8,11 +9,15 @@ import type { NavLink } from '~/common';
 import ConversationsSection from '~/components/UnifiedSidebar/ConversationsSection';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import useSideNavLinks from '~/hooks/Nav/useSideNavLinks';
+import { useAuthContext } from '~/hooks';
 import store from '~/store';
+import { createHeziNotebookLink } from './heziNotebookLink';
 
 const defaultInterface = getConfigDefaults().interface;
 
 export default function useUnifiedSidebarLinks() {
+  const navigate = useNavigate();
+  const { user } = useAuthContext();
   const conversation = useRecoilValue(store.conversationByIndex(0));
   const endpoint = conversation?.endpoint;
   const { data: startupConfig } = useGetStartupConfig();
@@ -57,9 +62,10 @@ export default function useUnifiedSidebarLinks() {
       id: 'conversations',
       Component: ConversationsSection,
     };
+    const notebookLink = createHeziNotebookLink(user?.role, navigate);
 
-    return [conversationLink, ...sideNavLinks];
-  }, [sideNavLinks]);
+    return [conversationLink, ...(notebookLink ? [notebookLink] : []), ...sideNavLinks];
+  }, [navigate, sideNavLinks, user?.role]);
 
   return links;
 }

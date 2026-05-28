@@ -101,6 +101,7 @@ afterEach(() => {
   delete process.env.SAML_CERT;
   delete process.env.SAML_SESSION_SECRET;
   delete process.env.ALLOW_ACCOUNT_DELETION;
+  delete process.env.NOTEBOOKLM_URL;
 });
 
 describe('GET /api/config', () => {
@@ -204,6 +205,16 @@ describe('GET /api/config', () => {
       expect(response.body.appTitle).toBe('Test App');
       expect(response.body).toHaveProperty('emailLoginEnabled');
       expect(response.body).toHaveProperty('serverDomain');
+    });
+
+    it('should include the configured NotebookLM URL', async () => {
+      mockGetAppConfig.mockResolvedValue(baseAppConfig);
+      process.env.NOTEBOOKLM_URL = 'https://notebook.example.com';
+      const app = createApp(null);
+
+      const response = await request(app).get('/api/config');
+
+      expect(response.body.notebookLmUrl).toBe('https://notebook.example.com');
     });
 
     it('should advertise CloudFront cookie refresh only when signed-cookie mode is active', async () => {
