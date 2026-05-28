@@ -140,4 +140,41 @@ describe('NewapiClient', () => {
     );
     abortTimeoutSpy.mockRestore();
   });
+
+  test('creates one NewAPI redemption code per invite', async () => {
+    process.env.HEZI_NEWAPI_ADMIN_TOKEN = 'admin-token';
+    process.env.HEZI_NEWAPI_ADMIN_USER_ID = '1';
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        data: ['redeem-a', 'redeem-b'],
+      }),
+    );
+    const { createRedemptionCodes } = require('./NewapiClient');
+
+    await expect(
+      createRedemptionCodes({
+        name: 'hezi_invite_smoke',
+        quota: 2500000,
+        count: 2,
+      }),
+    ).resolves.toEqual(['redeem-a', 'redeem-b']);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://newapi.test/api/redemption/',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'admin-token',
+          'New-Api-User': '1',
+        }),
+        body: JSON.stringify({
+          name: 'hezi_invite_smoke',
+          quota: 2500000,
+          count: 2,
+        }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
 });

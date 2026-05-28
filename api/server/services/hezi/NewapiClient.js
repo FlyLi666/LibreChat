@@ -345,6 +345,27 @@ async function redeemQuotaCode({ cookie, userId, code }) {
 }
 
 /**
+ * POST /api/redemption/ — admin creates one-use redemption codes.
+ * Returns the generated NewAPI code strings.
+ */
+async function createRedemptionCodes({ name, quota, count }) {
+  const res = await newapiFetch(`${BASE}/api/redemption/`, {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify({ name, quota, count }),
+  });
+  const { body, raw } = await readJsonOrText(res);
+  if (!res.ok || !body?.success || !Array.isArray(body.data)) {
+    throw new NewapiError(`createRedemptionCodes failed: ${body?.message || raw}`, {
+      status: res.status,
+      body: body || raw,
+      code: 'CREATE_REDEMPTION_FAILED',
+    });
+  }
+  return body.data;
+}
+
+/**
  * DELETE /api/user/:id — admin removes a shadow user.
  * Used by HeZi when LibreChat user is deleted.
  */
@@ -372,5 +393,6 @@ module.exports = {
   loginAsUser,
   createUserToken,
   redeemQuotaCode,
+  createRedemptionCodes,
   deleteShadowUser,
 };
