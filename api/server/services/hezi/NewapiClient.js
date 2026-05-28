@@ -161,9 +161,50 @@ async function loginAsUser({ username, password }) {
   };
 }
 
+function extractTokenKey(body, preferredName) {
+  const data = body?.data;
+  if (typeof data === 'string' && data.startsWith('sk-')) {
+    return data;
+  }
+  if (data?.key?.startsWith?.('sk-')) {
+    return data.key;
+  }
+
+  let items = [];
+  if (Array.isArray(data?.items)) {
+    items = data.items;
+  } else if (Array.isArray(data)) {
+    items = data;
+  }
+
+  const preferred = items.find(
+    (item) => item?.name === preferredName && item?.key?.startsWith?.('sk-'),
+  );
+  if (preferred) {
+    return preferred.key;
+  }
+  return items.find((item) => item?.key?.startsWith?.('sk-'))?.key || null;
+}
+
+async function listUserTokens({ cookie, userId, name }) {
+  const res = await fetch(`${BASE}/api/token/?p=0&page_size=10`, {
+    headers: userHeaders(cookie, userId),
+  });
+  const { body, raw } = await readJsonOrText(res);
+  if (!res.ok || !body?.success) {
+    throw new NewapiError('listUserTokens failed after create', {
+      status: res.status,
+      body: body || raw,
+      code: 'LIST_TOKENS_FAILED',
+    });
+  }
+  return extractTokenKey(body, name);
+}
+
 /**
  * POST /api/token/ — user creates an sk-xxx token.
- * NewAPI's response shape includes the full key only on creation.
+ * Some NewAPI builds return the new key in create response; this deployment
+ * returns only success=true, so we fall back to listing the user's tokens.
  */
 async function createUserToken({ cookie, userId, name, unlimited = true, expiredTime = -1 }) {
   const res = await fetch(`${BASE}/api/token/`, {
@@ -185,8 +226,7 @@ async function createUserToken({ cookie, userId, name, unlimited = true, expired
       code: 'CREATE_TOKEN_FAILED',
     });
   }
-  // The created token's key is in body.data.key (or body.data — depends on version).
-  const sk = body?.data?.key || (typeof body?.data === 'string' ? body.data : null);
+  const sk = extractTokenKey(body, name) || (await listUserTokens({ cookie, userId, name }));
   if (!sk || !sk.startsWith('sk-')) {
     throw new NewapiError('createUserToken returned no sk- key', {
       status: res.status,
@@ -229,7 +269,10 @@ async function deleteShadowUser(newapiUserId) {
   });
   const { body, raw } = await readJsonOrText(res);
   if (!res.ok || !body?.success) {
-    logger.warn('[NewapiClient] deleteShadowUser non-success', { status: res.status, body: body || raw });
+    logger.warn('[NewapiClient] deleteShadowUser non-success', {
+      status: res.status,
+      body: body || raw,
+    });
     return false;
   }
   return true;
