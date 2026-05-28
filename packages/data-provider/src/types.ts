@@ -748,3 +748,77 @@ export type TUpdateSkillNodeRequest = {
   parentId?: string | null;
   order?: number;
 };
+
+export type TImageParamSchema = {
+  name: string;
+  type: 'enum' | 'number' | 'boolean' | 'string' | 'image' | 'images';
+  default: unknown;
+  enum?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  maxCount?: number;
+  maxFileSize?: number;
+  i18nLabel?: string;
+};
+
+export type TImageModel = {
+  provider: string;
+  modelId: string;
+  displayName: string;
+  disabled?: boolean;
+  reason?: string;
+  paramSchemas: TImageParamSchema[];
+};
+
+export type TImageGenerationAsset = {
+  url: string;
+  width?: number;
+  height?: number;
+  mimeType?: string;
+};
+
+export type TImageGeneration = {
+  _id: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  error?: string;
+  asset?: TImageGenerationAsset;
+  seed?: number;
+  fileId?: string;
+  createdAt?: string;
+};
+
+export type TImageBatch = {
+  _id: string;
+  topicId: string;
+  provider: string;
+  model: string;
+  prompt: string;
+  params: Record<string, unknown>;
+  generations: TImageGeneration[];
+  createdAt?: string;
+};
+
+export type TImageTopic = {
+  _id: string;
+  title: string;
+  coverUrl?: string;
+  type: 'image' | 'video';
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TGenerateImageRequest = {
+  topicId?: string | null;
+  provider?: string;
+  model: string;
+  prompt: string;
+  params: Record<string, unknown>;
+  imageNum: number;
+};
+
+export type TGenerateImageResponse = {
+  topic?: TImageTopic;
+  batch: TImageBatch;
+  error?: string;
+};

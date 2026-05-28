@@ -43,6 +43,10 @@ jest.mock('../Search', () => ({
   __esModule: true,
   default: () => null,
 }));
+jest.mock('~/pages/Image', () => ({
+  __esModule: true,
+  default: () => null,
+}));
 jest.mock('../Root', () => ({
   __esModule: true,
   default: () => null,
@@ -73,5 +77,11 @@ describe('skills routes', () => {
     const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
 
     expect(paths).toContain('notebook');
+  });
+
+  it('registers the Image generation route', () => {
+    const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
+
+    expect(paths).toContain('image');
   });
 });

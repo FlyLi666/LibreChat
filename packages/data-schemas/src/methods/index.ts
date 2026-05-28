@@ -68,6 +68,7 @@ import {
   createHeziProvisioningErrorMethods,
   type HeziProvisioningErrorMethods,
 } from './heziProvisioningError';
+import { createGenerationMethods, type GenerationMethods } from './generation';
 
 export { RoleConflictError, DEFAULT_REFRESH_TOKEN_EXPIRY, DEFAULT_SESSION_EXPIRY };
 export { tokenValues, cacheTokenValues, premiumTokenValues, defaultRate };
@@ -106,7 +107,8 @@ export type AllMethods = UserMethods &
   AgentMethods &
   ConfigMethods &
   InviteCodeMethods &
-  HeziProvisioningErrorMethods;
+  HeziProvisioningErrorMethods &
+  GenerationMethods;
 
 /** Dependencies injected from the api layer into createMethods */
 export interface CreateMethodsDeps {
@@ -239,6 +241,7 @@ export function createMethods(
     /* HeZi */
     ...createInviteCodeMethods(mongoose),
     ...createHeziProvisioningErrorMethods(mongoose),
+    ...createGenerationMethods(mongoose),
   };
 }
 

@@ -36,10 +36,14 @@ export function useActivePanel() {
   return context;
 }
 
-/** Returns `active` when it matches a known link, otherwise the first link's id. */
-export function resolveActivePanel(active: string, links: { id: string }[]): string {
-  if (links.length > 0 && links.some((l) => l.id === active)) {
+/** Returns `active` when it matches a known panel link, otherwise the first panel link's id. */
+export function resolveActivePanel(
+  active: string,
+  links: { id: string; Component?: unknown }[],
+): string {
+  const panelLinks = links.filter((link) => !!link.Component);
+  if (panelLinks.length > 0 && panelLinks.some((l) => l.id === active)) {
     return active;
   }
-  return links[0]?.id ?? active;
+  return panelLinks[0]?.id ?? active;
 }

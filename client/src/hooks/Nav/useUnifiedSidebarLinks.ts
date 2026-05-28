@@ -12,6 +12,7 @@ import useSideNavLinks from '~/hooks/Nav/useSideNavLinks';
 import { useAuthContext } from '~/hooks';
 import store from '~/store';
 import { createHeziNotebookLink } from './heziNotebookLink';
+import { createHeziImageLink } from './heziImageLink';
 
 const defaultInterface = getConfigDefaults().interface;
 
@@ -62,9 +63,15 @@ export default function useUnifiedSidebarLinks() {
       id: 'conversations',
       Component: ConversationsSection,
     };
+    const imageLink = createHeziImageLink(navigate);
     const notebookLink = createHeziNotebookLink(user?.role, navigate);
 
-    return [conversationLink, ...(notebookLink ? [notebookLink] : []), ...sideNavLinks];
+    return [
+      conversationLink,
+      imageLink,
+      ...(notebookLink ? [notebookLink] : []),
+      ...sideNavLinks,
+    ];
   }, [navigate, sideNavLinks, user?.role]);
 
   return links;

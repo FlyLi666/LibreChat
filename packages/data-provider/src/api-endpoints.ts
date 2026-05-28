@@ -296,6 +296,15 @@ export const images = () => `${files()}/images`;
 
 export const avatar = () => `${images()}/avatar`;
 
+export const imageGeneration = () => `${BASE_URL}/api/images`;
+export const imageModels = () => `${imageGeneration()}/models`;
+export const imageTopics = () => `${imageGeneration()}/topics`;
+export const imageTopic = (topicId: string) => `${imageTopics()}/${topicId}`;
+export const imageBatches = (topicId: string) => `${imageTopics()}/${topicId}/batches`;
+export const imageGenerate = () => `${imageGeneration()}/generate`;
+export const imageGenerationItem = (generationId: string) =>
+  `${imageGeneration()}/generations/${generationId}`;
+
 export const speech = () => `${files()}/speech`;
 
 export const speechToText = () => `${speech()}/stt`;

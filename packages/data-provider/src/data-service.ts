@@ -145,6 +145,26 @@ export function getUserBalance(): Promise<t.TBalanceResponse> {
   return request.get(endpoints.balance());
 }
 
+export function getImageModels(): Promise<{ models: t.TImageModel[] }> {
+  return request.get(endpoints.imageModels());
+}
+
+export function getImageTopics(): Promise<{ topics: t.TImageTopic[] }> {
+  return request.get(endpoints.imageTopics());
+}
+
+export function getImageBatches(topicId: string): Promise<{ batches: t.TImageBatch[] }> {
+  return request.get(endpoints.imageBatches(topicId));
+}
+
+export function generateImage(payload: t.TGenerateImageRequest): Promise<t.TGenerateImageResponse> {
+  return request.post(endpoints.imageGenerate(), payload);
+}
+
+export function deleteImageGeneration(generationId: string): Promise<void> {
+  return request.delete(endpoints.imageGenerationItem(generationId));
+}
+
 export const updateTokenCount = (text: string) => {
   return request.post(endpoints.tokenizer(), { arg: text });
 };

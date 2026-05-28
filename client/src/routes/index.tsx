@@ -44,6 +44,11 @@ const loadNotebookPage = () =>
     Component: m.default,
   }));
 
+const loadImagePage = () =>
+  import('~/pages/Image').then((m) => ({
+    Component: m.default,
+  }));
+
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
@@ -126,6 +131,10 @@ export const router = createBrowserRouter(
             {
               path: 'search',
               element: <Search />,
+            },
+            {
+              path: 'image',
+              lazy: loadImagePage,
             },
             {
               path: 'notebook',

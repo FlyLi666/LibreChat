@@ -32,6 +32,11 @@ import { createGroupModel } from './group';
 import { createConfigModel } from './config';
 import { createInviteCodeModel } from './inviteCode';
 import { createHeziProvisioningErrorModel } from './heziProvisioningError';
+import {
+  createGenerationBatchModel,
+  createGenerationModel,
+  createGenerationTopicModel,
+} from './generation';
 
 /**
  * Creates all database models for all collections
@@ -72,5 +77,8 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Config: createConfigModel(mongoose),
     InviteCode: createInviteCodeModel(mongoose),
     HeziProvisioningError: createHeziProvisioningErrorModel(mongoose),
+    GenerationTopic: createGenerationTopicModel(mongoose),
+    GenerationBatch: createGenerationBatchModel(mongoose),
+    Generation: createGenerationModel(mongoose),
   };
 }
