@@ -301,6 +301,7 @@ export const imageModels = () => `${imageGeneration()}/models`;
 export const imageTopics = () => `${imageGeneration()}/topics`;
 export const imageTopic = (topicId: string) => `${imageTopics()}/${topicId}`;
 export const imageBatches = (topicId: string) => `${imageTopics()}/${topicId}/batches`;
+export const imageBatch = (batchId: string) => `${imageGeneration()}/batches/${batchId}`;
 export const imageGenerate = () => `${imageGeneration()}/generate`;
 export const imageGenerationItem = (generationId: string) =>
   `${imageGeneration()}/generations/${generationId}`;

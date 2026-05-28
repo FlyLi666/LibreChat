@@ -1387,6 +1387,7 @@
   "com_image_action_recreate": "重新生成",
   "com_image_action_download": "下载",
   "com_image_action_delete": "删除",
+  "com_image_action_delete_batch": "删除整组",
   "com_image_empty": "还没有作品，画点什么吧",
   "com_image_error_no_channel": "当前模型暂不可用，请换一个",
   "com_user_message": "您"

@@ -1769,6 +1769,7 @@
   "com_image_action_recreate": "Recreate",
   "com_image_action_download": "Download",
   "com_image_action_delete": "Delete",
+  "com_image_action_delete_batch": "Delete batch",
   "com_image_empty": "No images yet. Draw something.",
   "com_image_error_no_channel": "This model is unavailable. Choose another.",
   "com_user_message": "You"

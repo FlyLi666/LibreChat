@@ -9,6 +9,7 @@ import type {
 import { Button, OGDialog, OGDialogContent, OGDialogTitle } from '@librechat/client';
 import {
   useGenerateImageMutation,
+  useDeleteImageBatchMutation,
   useDeleteImageGenerationMutation,
   useDeleteImageTopicMutation,
   useImageBatchesQuery,
@@ -258,14 +259,18 @@ function TopicSidebar({
 
 function GenerationCard({
   batch,
+  onDeleteBatch,
   onDeleteGeneration,
   onRecreateBatch,
+  deletingBatch,
   deleting,
   generating,
 }: {
   batch: TImageBatch;
+  onDeleteBatch: (batchId: string) => void;
   onDeleteGeneration: (generationId: string) => void;
   onRecreateBatch: (batch: TImageBatch) => void;
+  deletingBatch: boolean;
   deleting: boolean;
   generating: boolean;
 }) {
@@ -279,6 +284,17 @@ function GenerationCard({
           <p className="text-sm font-medium text-text-primary">{batch.prompt}</p>
           <p className="mt-1 text-xs text-text-tertiary">{batch.model}</p>
         </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 shrink-0 gap-1 px-2 text-xs text-text-secondary"
+          aria-label={localize('com_image_action_delete_batch')}
+          disabled={deletingBatch}
+          onClick={() => onDeleteBatch(batch._id)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          {localize('com_image_action_delete_batch')}
+        </Button>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {batch.generations.map((generation) => {
@@ -423,6 +439,7 @@ export default function ImagePage() {
     isError: batchesError,
   } = useImageBatchesQuery(activeTopicId, { refetchInterval: activeTopicId ? 3000 : false });
   const generateMutation = useGenerateImageMutation();
+  const deleteBatchMutation = useDeleteImageBatchMutation();
   const deleteGenerationMutation = useDeleteImageGenerationMutation();
   const updateTopicMutation = useUpdateImageTopicMutation();
   const deleteTopicMutation = useDeleteImageTopicMutation();
@@ -437,6 +454,7 @@ export default function ImagePage() {
   const [prompt, setPrompt] = useState('');
   const [inlineBatches, setInlineBatches] = useState<TImageBatch[]>([]);
   const [deletedGenerationIds, setDeletedGenerationIds] = useState<Set<string>>(() => new Set());
+  const [deletedBatchIds, setDeletedBatchIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (!activeTopicId && topics[0]?._id) {
@@ -452,10 +470,10 @@ export default function ImagePage() {
 
   const displayedBatches = useMemo(() => {
     return filterDeletedGenerations(
-      mergeImageBatches(inlineBatches, batches),
+      mergeImageBatches(inlineBatches, batches).filter((batch) => !deletedBatchIds.has(batch._id)),
       deletedGenerationIds,
     );
-  }, [batches, deletedGenerationIds, inlineBatches]);
+  }, [batches, deletedBatchIds, deletedGenerationIds, inlineBatches]);
 
   const upsertInlineBatch = (batch: TImageBatch | undefined) => {
     if (!batch) {
@@ -467,6 +485,7 @@ export default function ImagePage() {
   const startNewTopic = () => {
     setActiveTopicId(null);
     setInlineBatches([]);
+    setDeletedBatchIds(new Set());
     setDeletedGenerationIds(new Set());
     setPrompt('');
   };
@@ -515,6 +534,15 @@ export default function ImagePage() {
     });
   };
 
+  const deleteBatch = async (batchId: string) => {
+    await deleteBatchMutation.mutateAsync(batchId);
+    setDeletedBatchIds((prev) => {
+      const next = new Set(prev);
+      next.add(batchId);
+      return next;
+    });
+  };
+
   const recreateBatch = async (batch: TImageBatch) => {
     const response = await generateMutation.mutateAsync({
       topicId: batch.topicId || activeTopicId,
@@ -539,6 +567,7 @@ export default function ImagePage() {
   const deleteTopic = async (topicId: string) => {
     await deleteTopicMutation.mutateAsync(topicId);
     setInlineBatches([]);
+    setDeletedBatchIds(new Set());
     setDeletedGenerationIds(new Set());
     if (activeTopicId === topicId) {
       const nextTopic = topics.find((topic) => topic._id !== topicId);
@@ -582,8 +611,10 @@ export default function ImagePage() {
           <GenerationCard
             key={batch._id}
             batch={batch}
+            deletingBatch={deleteBatchMutation.isLoading}
             deleting={deleteGenerationMutation.isLoading}
             generating={generateMutation.isLoading}
+            onDeleteBatch={deleteBatch}
             onDeleteGeneration={deleteGeneration}
             onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
           />

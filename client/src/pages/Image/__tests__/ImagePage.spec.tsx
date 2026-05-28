@@ -7,6 +7,7 @@ import ImagePage, { mergeImageBatches } from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
 const mockDeleteImageGeneration = jest.fn();
+const mockDeleteImageBatch = jest.fn();
 const mockUpdateImageTopic = jest.fn();
 const mockDeleteImageTopic = jest.fn();
 let mockBatchesLoading = false;
@@ -25,6 +26,7 @@ jest.mock('~/hooks', () => ({
       com_image_action_download: '下载',
       com_image_action_recreate: '重新生成',
       com_image_action_zoom: '放大查看',
+      com_image_action_delete_batch: '删除整组',
       com_ui_rename: '重命名',
       com_image_config_size: '尺寸',
       com_image_config_aspect: '比例',
@@ -70,6 +72,10 @@ jest.mock('~/data-provider/Images', () => ({
     mutateAsync: mockDeleteImageGeneration,
     isLoading: false,
   }),
+  useDeleteImageBatchMutation: () => ({
+    mutateAsync: mockDeleteImageBatch,
+    isLoading: false,
+  }),
   useUpdateImageTopicMutation: () => ({
     mutateAsync: mockUpdateImageTopic,
     isLoading: false,
@@ -96,6 +102,8 @@ describe('ImagePage', () => {
     mockGenerateImage.mockResolvedValue({});
     mockDeleteImageGeneration.mockReset();
     mockDeleteImageGeneration.mockResolvedValue(undefined);
+    mockDeleteImageBatch.mockReset();
+    mockDeleteImageBatch.mockResolvedValue(undefined);
     mockUpdateImageTopic.mockReset();
     mockUpdateImageTopic.mockResolvedValue({
       _id: 'topic-1',
@@ -257,6 +265,41 @@ describe('ImagePage', () => {
       expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
     });
     expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+  });
+
+  it('deletes a full image batch from the feed', async () => {
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '蓝色玻璃 App 图标',
+        params: {},
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/icon-1.png' },
+          },
+          {
+            _id: 'generation-2',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/icon-2.png' },
+          },
+        ],
+      },
+    ];
+    renderPage();
+
+    expect(screen.getAllByAltText('蓝色玻璃 App 图标')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '删除整组' }));
+
+    await waitFor(() => {
+      expect(mockDeleteImageBatch).toHaveBeenCalledWith('batch-1');
+      expect(screen.queryByAltText('蓝色玻璃 App 图标')).not.toBeInTheDocument();
+    });
+    expect(mockDeleteImageGeneration).not.toHaveBeenCalled();
   });
 
   it('opens a preview dialog for a generated image', () => {

@@ -58,6 +58,15 @@ export const useDeleteImageGenerationMutation = (): UseMutationResult<void, unkn
   });
 };
 
+export const useDeleteImageBatchMutation = (): UseMutationResult<void, unknown, string> => {
+  const queryClient = useQueryClient();
+  return useMutation((batchId: string) => dataService.deleteImageBatch(batchId), {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.imageBatches]);
+    },
+  });
+};
+
 export const useUpdateImageTopicMutation = (): UseMutationResult<
   { topic: TImageTopic },
   unknown,

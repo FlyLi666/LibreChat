@@ -168,6 +168,10 @@ export function getImageBatches(topicId: string): Promise<{ batches: t.TImageBat
   return request.get(endpoints.imageBatches(topicId));
 }
 
+export function deleteImageBatch(batchId: string): Promise<void> {
+  return request.delete(endpoints.imageBatch(batchId));
+}
+
 export function generateImage(payload: t.TGenerateImageRequest): Promise<t.TGenerateImageResponse> {
   return request.post(endpoints.imageGenerate(), payload);
 }
