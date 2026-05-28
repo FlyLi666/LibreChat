@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Maximize2, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, Maximize2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import type {
   TImageBatch,
   TImageModel,
@@ -10,9 +10,11 @@ import { Button } from '@librechat/client';
 import {
   useGenerateImageMutation,
   useDeleteImageGenerationMutation,
+  useDeleteImageTopicMutation,
   useImageBatchesQuery,
   useImageModelsQuery,
   useImageTopicsQuery,
+  useUpdateImageTopicMutation,
 } from '~/data-provider/Images';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
@@ -130,14 +132,44 @@ function TopicSidebar({
   activeTopicId,
   onSelect,
   onNewTopic,
+  onRenameTopic,
+  onDeleteTopic,
+  renaming,
+  deleting,
 }: {
   topics: TImageTopic[];
   activeTopicId: string | null;
   onSelect: (topicId: string) => void;
   onNewTopic: () => void;
+  onRenameTopic: (topicId: string, title: string) => Promise<void>;
+  onDeleteTopic: (topicId: string) => Promise<void>;
+  renaming: boolean;
+  deleting: boolean;
 }) {
   const localize = useLocalize();
   const groups = groupTopics(topics);
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+
+  const beginRename = (topic: TImageTopic) => {
+    setEditingTopicId(topic._id);
+    setEditingTitle(topic.title);
+  };
+
+  const cancelRename = () => {
+    setEditingTopicId(null);
+    setEditingTitle('');
+  };
+
+  const saveRename = async (topic: TImageTopic) => {
+    const title = editingTitle.trim();
+    if (!title || title === topic.title) {
+      cancelRename();
+      return;
+    }
+    await onRenameTopic(topic._id, title);
+    cancelRename();
+  };
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border-light bg-surface-primary-alt lg:flex lg:flex-col">
@@ -152,18 +184,59 @@ function TopicSidebar({
             <h2 className="mb-1 px-2 text-xs font-semibold text-text-tertiary">{group.label}</h2>
             <div className="grid gap-1">
               {group.topics.map((topic) => (
-                <button
+                <div
                   key={topic._id}
                   className={cn(
-                    'rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-surface-hover',
+                    'group flex items-center gap-1 rounded-lg px-1 py-1 text-sm transition-colors hover:bg-surface-hover',
                     topic._id === activeTopicId
                       ? 'bg-surface-active-alt text-text-primary'
                       : 'text-text-secondary',
                   )}
-                  onClick={() => onSelect(topic._id)}
                 >
-                  <span className="line-clamp-1">{topic.title}</span>
-                </button>
+                  {editingTopicId === topic._id ? (
+                    <input
+                      className="min-w-0 flex-1 rounded-md border border-border-light bg-surface-primary px-2 py-1 text-sm text-text-primary outline-none"
+                      value={editingTitle}
+                      onBlur={() => void saveRename(topic)}
+                      onChange={(event) => setEditingTitle(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void saveRename(topic);
+                        }
+                        if (event.key === 'Escape') {
+                          cancelRename();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      className="min-w-0 flex-1 rounded-md px-1 py-1 text-left"
+                      onClick={() => onSelect(topic._id)}
+                    >
+                      <span className="line-clamp-1">{topic.title}</span>
+                    </button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+                    aria-label={localize('com_ui_rename')}
+                    disabled={renaming || editingTopicId === topic._id}
+                    onClick={() => beginRename(topic)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+                    aria-label={localize('com_image_action_delete')}
+                    disabled={deleting}
+                    onClick={() => void onDeleteTopic(topic._id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               ))}
             </div>
           </section>
@@ -303,6 +376,8 @@ export default function ImagePage() {
   } = useImageBatchesQuery(activeTopicId, { refetchInterval: activeTopicId ? 3000 : false });
   const generateMutation = useGenerateImageMutation();
   const deleteGenerationMutation = useDeleteImageGenerationMutation();
+  const updateTopicMutation = useUpdateImageTopicMutation();
+  const deleteTopicMutation = useDeleteImageTopicMutation();
   const localModels = useMemo(() => getLocalImageModels(), []);
   const models = remoteModels?.length ? remoteModels : localModels;
   const [modelId, setModelId] = useState('gpt-image-2');
@@ -392,6 +467,20 @@ export default function ImagePage() {
     });
   };
 
+  const renameTopic = async (topicId: string, title: string) => {
+    await updateTopicMutation.mutateAsync({ topicId, title });
+  };
+
+  const deleteTopic = async (topicId: string) => {
+    await deleteTopicMutation.mutateAsync(topicId);
+    setInlineBatches([]);
+    setDeletedGenerationIds(new Set());
+    if (activeTopicId === topicId) {
+      const nextTopic = topics.find((topic) => topic._id !== topicId);
+      setActiveTopicId(nextTopic?._id ?? null);
+    }
+  };
+
   const renderWorkspace = () => {
     if (modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches) {
       return (
@@ -443,6 +532,10 @@ export default function ImagePage() {
         activeTopicId={activeTopicId}
         onSelect={setActiveTopicId}
         onNewTopic={startNewTopic}
+        onRenameTopic={renameTopic}
+        onDeleteTopic={deleteTopic}
+        renaming={updateTopicMutation.isLoading}
+        deleting={deleteTopicMutation.isLoading}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">{renderWorkspace()}</div>

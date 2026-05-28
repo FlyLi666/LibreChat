@@ -153,6 +153,17 @@ export function getImageTopics(): Promise<{ topics: t.TImageTopic[] }> {
   return request.get(endpoints.imageTopics());
 }
 
+export function updateImageTopic(payload: {
+  topicId: string;
+  title: string;
+}): Promise<{ topic: t.TImageTopic }> {
+  return request.patch(endpoints.imageTopic(payload.topicId), { title: payload.title });
+}
+
+export function deleteImageTopic(topicId: string): Promise<void> {
+  return request.delete(endpoints.imageTopic(topicId));
+}
+
 export function getImageBatches(topicId: string): Promise<{ batches: t.TImageBatch[] }> {
   return request.get(endpoints.imageBatches(topicId));
 }

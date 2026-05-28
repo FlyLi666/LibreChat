@@ -7,8 +7,11 @@ import ImagePage, { mergeImageBatches } from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
 const mockDeleteImageGeneration = jest.fn();
+const mockUpdateImageTopic = jest.fn();
+const mockDeleteImageTopic = jest.fn();
 let mockBatchesLoading = false;
 let mockBatches: unknown[] = [];
+let mockTopics: unknown[] = [];
 
 jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) =>
@@ -19,6 +22,7 @@ jest.mock('~/hooks', () => ({
       com_image_prompt_placeholder: '描述你想画的内容...',
       com_image_generate: '生成',
       com_image_action_delete: '删除',
+      com_ui_rename: '重命名',
       com_image_config_size: '尺寸',
       com_image_config_aspect: '比例',
       com_image_config_resolution: '分辨率',
@@ -53,7 +57,7 @@ jest.mock('~/data-provider/Images', () => ({
       },
     ],
   }),
-  useImageTopicsQuery: () => ({ data: [] }),
+  useImageTopicsQuery: () => ({ data: mockTopics }),
   useImageBatchesQuery: () => ({ data: mockBatches, isLoading: mockBatchesLoading }),
   useGenerateImageMutation: () => ({
     mutateAsync: mockGenerateImage,
@@ -61,6 +65,14 @@ jest.mock('~/data-provider/Images', () => ({
   }),
   useDeleteImageGenerationMutation: () => ({
     mutateAsync: mockDeleteImageGeneration,
+    isLoading: false,
+  }),
+  useUpdateImageTopicMutation: () => ({
+    mutateAsync: mockUpdateImageTopic,
+    isLoading: false,
+  }),
+  useDeleteImageTopicMutation: () => ({
+    mutateAsync: mockDeleteImageTopic,
     isLoading: false,
   }),
 }));
@@ -81,6 +93,15 @@ describe('ImagePage', () => {
     mockGenerateImage.mockResolvedValue({});
     mockDeleteImageGeneration.mockReset();
     mockDeleteImageGeneration.mockResolvedValue(undefined);
+    mockUpdateImageTopic.mockReset();
+    mockUpdateImageTopic.mockResolvedValue({
+      _id: 'topic-1',
+      title: '新主题名',
+      type: 'image',
+    });
+    mockDeleteImageTopic.mockReset();
+    mockDeleteImageTopic.mockResolvedValue(undefined);
+    mockTopics = [];
     mockBatches = [];
     mockBatchesLoading = false;
   });
@@ -233,5 +254,34 @@ describe('ImagePage', () => {
       expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
     });
     expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+  });
+
+  it('renames an image topic from the sidebar', async () => {
+    mockTopics = [{ _id: 'topic-1', title: '旧主题名', type: 'image' }];
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: '重命名' }));
+    fireEvent.change(screen.getByDisplayValue('旧主题名'), { target: { value: '新主题名' } });
+    fireEvent.keyDown(screen.getByDisplayValue('新主题名'), { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(mockUpdateImageTopic).toHaveBeenCalledWith({
+        topicId: 'topic-1',
+        title: '新主题名',
+      });
+    });
+  });
+
+  it('deletes an image topic from the sidebar', async () => {
+    mockTopics = [{ _id: 'topic-1', title: '旧主题名', type: 'image' }];
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+
+    await waitFor(() => {
+      expect(mockDeleteImageTopic).toHaveBeenCalledWith('topic-1');
+    });
   });
 });

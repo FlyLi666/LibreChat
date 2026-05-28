@@ -57,3 +57,30 @@ export const useDeleteImageGenerationMutation = (): UseMutationResult<void, unkn
     },
   });
 };
+
+export const useUpdateImageTopicMutation = (): UseMutationResult<
+  { topic: TImageTopic },
+  unknown,
+  { topicId: string; title: string }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation((payload) => dataService.updateImageTopic(payload), {
+    onSuccess: (response) => {
+      queryClient.setQueryData<TImageTopic[]>([QueryKeys.imageTopics], (topics = []) =>
+        topics.map((topic) => (topic._id === response.topic._id ? response.topic : topic)),
+      );
+    },
+  });
+};
+
+export const useDeleteImageTopicMutation = (): UseMutationResult<void, unknown, string> => {
+  const queryClient = useQueryClient();
+  return useMutation((topicId) => dataService.deleteImageTopic(topicId), {
+    onSuccess: (_response, topicId) => {
+      queryClient.setQueryData<TImageTopic[]>([QueryKeys.imageTopics], (topics = []) =>
+        topics.filter((topic) => topic._id !== topicId),
+      );
+      queryClient.removeQueries([QueryKeys.imageBatches, topicId]);
+    },
+  });
+};
