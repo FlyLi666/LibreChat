@@ -24,11 +24,19 @@ const mockImageService = {
 const mockImageAssetStorage = {
   persistGeneratedImageAsset: jest.fn(),
 };
+const mockAppConfig = {
+  fileStrategy: 'local',
+  fileConfig: { imageGeneration: { px: 1024 } },
+};
 
 jest.mock('~/models', () => mockDb);
 
 jest.mock('~/server/middleware', () => ({
   requireJwtAuth: (req, _res, next) => next(),
+  configMiddleware: (req, _res, next) => {
+    req.config = mockAppConfig;
+    next();
+  },
 }));
 
 jest.mock('~/server/services/hezi/ImageGenerationService', () => mockImageService);
@@ -237,6 +245,9 @@ describe('image generation routes', () => {
     await flushBackgroundJobs();
     expect(mockImageAssetStorage.persistGeneratedImageAsset).toHaveBeenCalledWith(
       expect.objectContaining({
+        req: expect.objectContaining({
+          config: mockAppConfig,
+        }),
         image: { b64: 'abc123', mimeType: 'image/png' },
         generationId: 'generation-1',
       }),

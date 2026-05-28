@@ -1,6 +1,6 @@
 const express = require('express');
 const { logger, isValidObjectIdString } = require('@librechat/data-schemas');
-const { requireJwtAuth } = require('~/server/middleware');
+const { requireJwtAuth, configMiddleware } = require('~/server/middleware');
 const db = require('~/models');
 const {
   getImageModels,
@@ -12,6 +12,7 @@ const { persistGeneratedImageAsset } = require('~/server/services/hezi/ImageAsse
 const router = express.Router();
 
 router.use(requireJwtAuth);
+router.use(configMiddleware);
 
 function getUserId(req) {
   return req.user?.id || req.user?._id;
