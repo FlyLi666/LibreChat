@@ -35,19 +35,13 @@ nope() { red   "  FAIL  $*"; FAIL=$((FAIL+1)); }
 
 # === 0. GHCR public check ===
 note "0. Verifying GHCR is anonymously pullable"
-HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://ghcr.io/v2/flyli666/hezi-libreai/manifests/latest")
-if [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ]; then
-  red "GHCR still private (HTTP $HTTP). Flip visibility to Public:"
-  red "  https://github.com/users/FlyLi666/packages/container/hezi-libreai/settings"
-  exit 2
-fi
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:flyli666/hezi-libreai:pull&service=ghcr.io" | jq -r '.token // empty')
 if [ -z "$TOKEN" ]; then
   red "GHCR anon-token endpoint returned no token. Package not public yet."
   exit 2
 fi
 M_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" \
-  -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
+  -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
   "https://ghcr.io/v2/flyli666/hezi-libreai/manifests/latest")
 if [ "$M_HTTP" != "200" ]; then
   red "GHCR manifest fetch with anon-issued token returned $M_HTTP. Not fully public."
@@ -58,7 +52,7 @@ ok "GHCR public; manifest fetchable anonymously"
 # === 1. Pull + restart on GCP ===
 note "1. Pulling image + restarting container"
 ssh "$SSH_HOST" "cd $GCP_DIR && docker compose pull librechat 2>&1 | tail -5" || { nope "docker compose pull failed"; exit 3; }
-ssh "$SSH_HOST" "cd $GCP_DIR && docker compose up -d librechat" || { nope "docker compose up failed"; exit 3; }
+ssh "$SSH_HOST" "cd $GCP_DIR && docker compose up -d --no-deps librechat && docker compose start rag-api >/dev/null 2>&1 || true" || { nope "docker compose up failed"; exit 3; }
 ok "container restart issued"
 
 # === 2. Wait for health ===
@@ -79,7 +73,7 @@ fi
 
 # === 3. Seed invite codes ===
 note "3. Seeding 10 invite codes"
-SEED_OUT=$(ssh "$SSH_HOST" "cd $GCP_DIR && docker compose exec -T librechat npm run hezi-seed-invites -- --count=10 --note='smoke-test' 2>&1 | tail -25")
+SEED_OUT=$(ssh "$SSH_HOST" "cd $GCP_DIR && docker compose exec -T --workdir /app librechat npm run hezi-seed-invites -- --count=10 --note='smoke-test' 2>&1 | tail -25")
 echo "$SEED_OUT"
 # Extract codes (10-char base32)
 CODES=$(echo "$SEED_OUT" | grep -oE '^\s+[A-Z2-9]{10}$' | tr -d ' ' | head -10)

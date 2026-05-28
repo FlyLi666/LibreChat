@@ -57,7 +57,7 @@ async function provisionShadowAccount({ user, quotaCode }) {
   }
   const userId = String(user._id);
   const username = `hezi_${userId.slice(-12)}`; // <= 17 chars; NewAPI accepts
-  const displayName = user.email || username;
+  const displayName = username;
   const password = generateShadowPassword();
 
   // 1+2. Create shadow user (ignore "already exists" — recover by lookup)
@@ -120,7 +120,9 @@ async function provisionShadowAccount({ user, quotaCode }) {
     quota_code: quotaCode || '',
   });
 
-  logger.info(`[HeziProvisioning] provisioned ${username} (newapiId=${newapiUserId}, redeemed=${redeemed})`);
+  logger.info(
+    `[HeziProvisioning] provisioned ${username} (newapiId=${newapiUserId}, redeemed=${redeemed})`,
+  );
   return { newapiUserId, sk, redeemed };
 }
 
