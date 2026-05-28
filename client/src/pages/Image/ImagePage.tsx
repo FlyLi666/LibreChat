@@ -6,7 +6,7 @@ import type {
   TImageParamSchema,
   TImageTopic,
 } from 'librechat-data-provider';
-import { Button } from '@librechat/client';
+import { Button, OGDialog, OGDialogContent, OGDialogTitle } from '@librechat/client';
 import {
   useGenerateImageMutation,
   useDeleteImageGenerationMutation,
@@ -17,7 +17,7 @@ import {
   useUpdateImageTopicMutation,
 } from '~/data-provider/Images';
 import { useLocalize } from '~/hooks';
-import { cn } from '~/utils';
+import { cn, triggerDownload } from '~/utils';
 import {
   getDefaultImageParams,
   getImageModels as getLocalImageModels,
@@ -74,6 +74,16 @@ function getSchemaLabel(schema: TImageParamSchema, localize: ReturnType<typeof u
   const key =
     schema.i18nLabel || schemaLabelFallbacks[schema.name] || `com_image_config_${schema.name}`;
   return localize(key as Parameters<typeof localize>[0]);
+}
+
+function getImageDownloadFilename(url: string) {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    const filename = parsed.pathname.split('/').filter(Boolean).pop();
+    return filename || 'hezi-image.png';
+  } catch {
+    return 'hezi-image.png';
+  }
 }
 
 function ParamControl({
@@ -249,13 +259,18 @@ function TopicSidebar({
 function GenerationCard({
   batch,
   onDeleteGeneration,
+  onRecreateBatch,
   deleting,
+  generating,
 }: {
   batch: TImageBatch;
   onDeleteGeneration: (generationId: string) => void;
+  onRecreateBatch: (batch: TImageBatch) => void;
   deleting: boolean;
+  generating: boolean;
 }) {
   const localize = useLocalize();
+  const [preview, setPreview] = useState<{ url: string; prompt: string } | null>(null);
 
   return (
     <article className="rounded-lg border border-border-light bg-surface-primary p-3">
@@ -266,59 +281,88 @@ function GenerationCard({
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {batch.generations.map((generation) => (
-          <div
-            key={generation._id}
-            className="group relative aspect-square overflow-hidden rounded-lg bg-surface-secondary"
-          >
-            <div className="bg-surface-primary/90 absolute right-2 top-2 z-10 flex gap-1 rounded-lg p-1 opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
-              <Button size="icon" variant="ghost" aria-label={localize('com_image_action_zoom')}>
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={localize('com_image_action_download')}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={localize('com_image_action_recreate')}
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={localize('com_image_action_delete')}
-                disabled={deleting}
-                onClick={() => onDeleteGeneration(generation._id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+        {batch.generations.map((generation) => {
+          const imageUrl = generation.status === 'succeeded' ? generation.asset?.url : undefined;
+          const hasImage = !!imageUrl;
+
+          return (
+            <div
+              key={generation._id}
+              className="group relative aspect-square overflow-hidden rounded-lg bg-surface-secondary"
+            >
+              <div className="bg-surface-primary/90 absolute right-2 top-2 z-10 flex gap-1 rounded-lg p-1 opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={localize('com_image_action_zoom')}
+                  disabled={!hasImage}
+                  onClick={() => imageUrl && setPreview({ url: imageUrl, prompt: batch.prompt })}
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={localize('com_image_action_download')}
+                  disabled={!hasImage}
+                  onClick={() =>
+                    imageUrl && triggerDownload(imageUrl, getImageDownloadFilename(imageUrl))
+                  }
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={localize('com_image_action_recreate')}
+                  disabled={generating}
+                  onClick={() => onRecreateBatch(batch)}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={localize('com_image_action_delete')}
+                  disabled={deleting}
+                  onClick={() => onDeleteGeneration(generation._id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              {generation.status === 'pending' && (
+                <div className="flex h-full items-center justify-center text-sm text-text-secondary">
+                  生成中...
+                </div>
+              )}
+              {generation.status === 'failed' && (
+                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-red-600">
+                  {generation.error || localize('com_image_error_no_channel')}
+                </div>
+              )}
+              {imageUrl && (
+                <img src={imageUrl} alt={batch.prompt} className="h-full w-full object-cover" />
+              )}
             </div>
-            {generation.status === 'pending' && (
-              <div className="flex h-full items-center justify-center text-sm text-text-secondary">
-                生成中...
-              </div>
-            )}
-            {generation.status === 'failed' && (
-              <div className="flex h-full items-center justify-center px-4 text-center text-sm text-red-600">
-                {generation.error || localize('com_image_error_no_channel')}
-              </div>
-            )}
-            {generation.status === 'succeeded' && generation.asset?.url && (
+          );
+        })}
+      </div>
+      <OGDialog open={!!preview} onOpenChange={(open) => !open && setPreview(null)}>
+        <OGDialogContent className="h-[90vh] max-h-[90vh] w-[94vw] max-w-5xl overflow-hidden border-border-light bg-surface-primary p-0">
+          <OGDialogTitle className="border-b border-border-light px-4 py-3 text-sm font-medium text-text-primary">
+            {preview?.prompt}
+          </OGDialogTitle>
+          <div className="flex h-[calc(90vh-56px)] items-center justify-center bg-surface-primary-alt p-4">
+            {preview && (
               <img
-                src={generation.asset.url}
-                alt={batch.prompt}
-                className="h-full w-full object-cover"
+                src={preview.url}
+                alt={preview.prompt}
+                className="max-h-full max-w-full object-contain"
               />
             )}
           </div>
-        ))}
-      </div>
+        </OGDialogContent>
+      </OGDialog>
     </article>
   );
 }
@@ -467,6 +511,23 @@ export default function ImagePage() {
     });
   };
 
+  const recreateBatch = async (batch: TImageBatch) => {
+    const response = await generateMutation.mutateAsync({
+      topicId: batch.topicId || activeTopicId,
+      provider: batch.provider,
+      model: batch.model,
+      prompt: batch.prompt,
+      params: batch.params,
+      imageNum: Number(
+        (batch.params as Params | undefined)?.imageNum || batch.generations.length || 1,
+      ),
+    });
+    if (response.topic?._id) {
+      setActiveTopicId(response.topic._id);
+    }
+    upsertInlineBatch(response.batch);
+  };
+
   const renameTopic = async (topicId: string, title: string) => {
     await updateTopicMutation.mutateAsync({ topicId, title });
   };
@@ -518,7 +579,9 @@ export default function ImagePage() {
             key={batch._id}
             batch={batch}
             deleting={deleteGenerationMutation.isLoading}
+            generating={generateMutation.isLoading}
             onDeleteGeneration={deleteGeneration}
+            onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
           />
         ))}
       </div>

@@ -22,6 +22,9 @@ jest.mock('~/hooks', () => ({
       com_image_prompt_placeholder: '描述你想画的内容...',
       com_image_generate: '生成',
       com_image_action_delete: '删除',
+      com_image_action_download: '下载',
+      com_image_action_recreate: '重新生成',
+      com_image_action_zoom: '放大查看',
       com_ui_rename: '重命名',
       com_image_config_size: '尺寸',
       com_image_config_aspect: '比例',
@@ -254,6 +257,106 @@ describe('ImagePage', () => {
       expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
     });
     expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+  });
+
+  it('opens a preview dialog for a generated image', () => {
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '蓝色玻璃 App 图标',
+        params: {},
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/icon.png' },
+          },
+        ],
+      },
+    ];
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: '放大查看' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByAltText('蓝色玻璃 App 图标')).toHaveLength(2);
+  });
+
+  it('downloads a generated image with a stable filename', () => {
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '蓝色玻璃 App 图标',
+        params: {},
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/hezi-image-abc.png' },
+          },
+        ],
+      },
+    ];
+    renderPage();
+    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation();
+    const appendedLinks: HTMLAnchorElement[] = [];
+    const appendSpy = jest.spyOn(document.body, 'appendChild').mockImplementation((node: Node) => {
+      appendedLinks.push(node as HTMLAnchorElement);
+      return node;
+    });
+    const removeSpy = jest
+      .spyOn(document.body, 'removeChild')
+      .mockImplementation((node: Node) => node);
+
+    fireEvent.click(screen.getByRole('button', { name: '下载' }));
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(appendedLinks[0]?.href).toContain('/images/user-123/hezi-image-abc.png');
+    expect(appendedLinks[0]?.download).toBe('hezi-image-abc.png');
+
+    clickSpy.mockRestore();
+    appendSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
+  it('recreates a generated batch with its original prompt and params', async () => {
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '蓝色玻璃 App 图标',
+        params: { imageNum: 2, quality: 'hd', size: '1024x1024' },
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/icon.png' },
+          },
+        ],
+      },
+    ];
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: '重新生成' }));
+
+    await waitFor(() => {
+      expect(mockGenerateImage).toHaveBeenCalledWith({
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '蓝色玻璃 App 图标',
+        params: { imageNum: 2, quality: 'hd', size: '1024x1024' },
+        imageNum: 2,
+      });
+    });
   });
 
   it('renames an image topic from the sidebar', async () => {
