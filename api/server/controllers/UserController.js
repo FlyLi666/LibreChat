@@ -18,6 +18,7 @@ const {
 const { updateUserPluginAuth, deleteUserPluginAuth } = require('~/server/services/PluginService');
 const { verifyOTPOrBackupCode } = require('~/server/services/twoFactorService');
 const { verifyEmail, resendVerificationEmail } = require('~/server/services/AuthService');
+const { cleanupShadowAccount } = require('~/server/services/hezi/HeziProvisioning');
 const { getMCPManager, getFlowStateManager, getMCPServersRegistry } = require('~/config');
 const { invalidateCachedTools } = require('~/server/services/Config/getCachedTools');
 const { processDeleteRequest } = require('~/server/services/Files/process');
@@ -332,6 +333,14 @@ const deleteUserController = async (req, res) => {
       await db.deleteConvos(user.id);
     } catch (error) {
       logger.error('[deleteUserController] Error deleting user convos, likely no convos', error);
+    }
+    try {
+      await cleanupShadowAccount(user.id);
+    } catch (error) {
+      logger.warn('[deleteUserController] HeZi shadow cleanup failed', {
+        userId: user.id,
+        error: error.message,
+      });
     }
     await deleteUserPluginAuth(user.id, null, true);
     await db.deleteUserById(user.id);

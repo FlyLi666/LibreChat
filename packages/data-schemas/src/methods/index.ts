@@ -64,6 +64,10 @@ import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
 import { createConfigMethods, type ConfigMethods } from './config';
 /* HeZi — invite codes */
 import { createInviteCodeMethods, type InviteCodeMethods } from './inviteCode';
+import {
+  createHeziProvisioningErrorMethods,
+  type HeziProvisioningErrorMethods,
+} from './heziProvisioningError';
 
 export { RoleConflictError, DEFAULT_REFRESH_TOKEN_EXPIRY, DEFAULT_SESSION_EXPIRY };
 export { tokenValues, cacheTokenValues, premiumTokenValues, defaultRate };
@@ -101,7 +105,8 @@ export type AllMethods = UserMethods &
   SkillMethods &
   AgentMethods &
   ConfigMethods &
-  InviteCodeMethods;
+  InviteCodeMethods &
+  HeziProvisioningErrorMethods;
 
 /** Dependencies injected from the api layer into createMethods */
 export interface CreateMethodsDeps {
@@ -233,6 +238,7 @@ export function createMethods(
     ...createConfigMethods(mongoose),
     /* HeZi */
     ...createInviteCodeMethods(mongoose),
+    ...createHeziProvisioningErrorMethods(mongoose),
   };
 }
 
@@ -279,4 +285,5 @@ export type {
   AgentMethods,
   ConfigMethods,
   InviteCodeMethods,
+  HeziProvisioningErrorMethods,
 };

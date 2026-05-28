@@ -19,7 +19,7 @@
  *   - Step 7 must succeed: persistence is required, otherwise we can't recover later.
  */
 
-const { encryptV3, logger } = require('@librechat/data-schemas');
+const { encryptV3, decryptV3, logger } = require('@librechat/data-schemas');
 const {
   NewapiError,
   generateShadowPassword,
@@ -28,6 +28,7 @@ const {
   loginAsUser,
   createUserToken,
   redeemQuotaCode,
+  deleteShadowUser,
 } = require('./NewapiClient');
 const {
   updatePluginAuth,
@@ -35,6 +36,8 @@ const {
   deleteUserKey,
   deletePluginAuth,
   findOnePluginAuth,
+  createHeziProvisioningError,
+  countHeziProvisioningErrors,
 } = require('~/models');
 
 const PLUGIN_KEY = 'newapi-shadow';
@@ -163,6 +166,66 @@ async function hasShadowAccount(userId) {
   return !!row;
 }
 
+function serializeError(error) {
+  if (!error) {
+    return 'Unknown error';
+  }
+  if (error instanceof Error && error.message) {
+    return error.message.slice(0, 2048);
+  }
+  if (typeof error === 'string') {
+    return error.slice(0, 2048);
+  }
+  try {
+    return JSON.stringify(error).slice(0, 2048);
+  } catch {
+    return String(error).slice(0, 2048);
+  }
+}
+
+async function recordProvisioningError({ userId, step, error }) {
+  const normalizedUserId = String(userId);
+  const existingCount = await countHeziProvisioningErrors({
+    userId: normalizedUserId,
+    step,
+  });
+  await createHeziProvisioningError({
+    userId: normalizedUserId,
+    step,
+    error: serializeError(error),
+    retryCount: existingCount + 1,
+  });
+}
+
+async function cleanupShadowAccount(userId) {
+  const normalizedUserId = String(userId);
+  try {
+    const row = await findOnePluginAuth({
+      userId: normalizedUserId,
+      pluginKey: PLUGIN_KEY,
+      authField: 'newapi_user_id',
+    });
+    if (!row?.value) {
+      return false;
+    }
+    const newapiUserId = decryptV3(row.value);
+    const numericId = Number(newapiUserId);
+    if (!Number.isFinite(numericId)) {
+      logger.warn('[HeziProvisioning] invalid newapi_user_id for cleanup', {
+        userId: normalizedUserId,
+      });
+      return false;
+    }
+    return await deleteShadowUser(numericId);
+  } catch (err) {
+    logger.warn('[HeziProvisioning] cleanupShadowAccount failed', {
+      userId: normalizedUserId,
+      err: err.message,
+    });
+    return false;
+  }
+}
+
 /** Best-effort cleanup if registration rolls back. */
 async function rollbackShadowAccount(userId) {
   try {
@@ -179,6 +242,8 @@ async function rollbackShadowAccount(userId) {
 module.exports = {
   provisionShadowAccount,
   hasShadowAccount,
+  recordProvisioningError,
+  cleanupShadowAccount,
   rollbackShadowAccount,
   PLUGIN_KEY,
   HEZI_ENDPOINT_NAME,

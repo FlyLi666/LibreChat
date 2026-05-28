@@ -2,6 +2,7 @@ jest.mock(
   '@librechat/data-schemas',
   () => ({
     encryptV3: jest.fn((value) => `enc:${value}`),
+    decryptV3: jest.fn((value) => value.replace(/^enc:/, '')),
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   }),
   { virtual: true },
@@ -15,6 +16,7 @@ jest.mock('./NewapiClient', () => ({
   loginAsUser: jest.fn(),
   createUserToken: jest.fn(),
   redeemQuotaCode: jest.fn(),
+  deleteShadowUser: jest.fn(),
 }));
 
 jest.mock('~/models', () => ({
@@ -23,6 +25,8 @@ jest.mock('~/models', () => ({
   deleteUserKey: jest.fn(),
   deletePluginAuth: jest.fn(),
   findOnePluginAuth: jest.fn(),
+  createHeziProvisioningError: jest.fn(),
+  countHeziProvisioningErrors: jest.fn(),
 }));
 
 const {
@@ -30,9 +34,20 @@ const {
   findShadowUserByUsername,
   loginAsUser,
   createUserToken,
+  deleteShadowUser,
 } = require('./NewapiClient');
-const { updatePluginAuth, updateUserKey } = require('~/models');
-const { provisionShadowAccount } = require('./HeziProvisioning');
+const {
+  updatePluginAuth,
+  updateUserKey,
+  findOnePluginAuth,
+  createHeziProvisioningError,
+  countHeziProvisioningErrors,
+} = require('~/models');
+const {
+  provisionShadowAccount,
+  recordProvisioningError,
+  cleanupShadowAccount,
+} = require('./HeziProvisioning');
 
 describe('HeziProvisioning', () => {
   beforeEach(() => {
@@ -41,8 +56,12 @@ describe('HeziProvisioning', () => {
     findShadowUserByUsername.mockResolvedValue({ id: 42 });
     loginAsUser.mockResolvedValue({ cookie: 'session=abc', userId: 42 });
     createUserToken.mockResolvedValue('sk-test');
+    deleteShadowUser.mockResolvedValue(true);
+    findOnePluginAuth.mockResolvedValue(null);
     updatePluginAuth.mockResolvedValue({});
     updateUserKey.mockResolvedValue({});
+    createHeziProvisioningError.mockResolvedValue({});
+    countHeziProvisioningErrors.mockResolvedValue(0);
     process.env.HEZI_NEWAPI_BASE_URL = 'https://newapi.flyli.cn';
   });
 
@@ -78,5 +97,39 @@ describe('HeziProvisioning', () => {
       }),
       expiresAt: null,
     });
+  });
+
+  test('records provisioning errors with the next retry count', async () => {
+    countHeziProvisioningErrors.mockResolvedValue(2);
+
+    await recordProvisioningError({
+      userId: '66554433221100ffeeddccbb',
+      step: 'login_fallback',
+      error: new Error('NewAPI temporarily unavailable'),
+    });
+
+    expect(countHeziProvisioningErrors).toHaveBeenCalledWith({
+      userId: '66554433221100ffeeddccbb',
+      step: 'login_fallback',
+    });
+    expect(createHeziProvisioningError).toHaveBeenCalledWith({
+      userId: '66554433221100ffeeddccbb',
+      step: 'login_fallback',
+      error: 'NewAPI temporarily unavailable',
+      retryCount: 3,
+    });
+  });
+
+  test('deletes the remote NewAPI shadow user from the v3-encrypted stored id', async () => {
+    findOnePluginAuth.mockResolvedValue({ value: 'enc:42' });
+
+    await cleanupShadowAccount('66554433221100ffeeddccbb');
+
+    expect(findOnePluginAuth).toHaveBeenCalledWith({
+      userId: '66554433221100ffeeddccbb',
+      pluginKey: 'newapi-shadow',
+      authField: 'newapi_user_id',
+    });
+    expect(deleteShadowUser).toHaveBeenCalledWith(42);
   });
 });

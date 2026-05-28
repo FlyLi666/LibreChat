@@ -18,6 +18,7 @@ const BASE = process.env.HEZI_NEWAPI_BASE_URL || 'https://newapi.flyli.cn';
 const ADMIN_TOKEN = process.env.HEZI_NEWAPI_ADMIN_TOKEN;
 const ADMIN_USER_ID = process.env.HEZI_NEWAPI_ADMIN_USER_ID || '1';
 const SHADOW_PASSWORD_LEN = 16; // < 20 char NewAPI cap, leaves margin
+const DEFAULT_TIMEOUT_MS = 8000;
 
 class NewapiError extends Error {
   constructor(message, { status, body, code } = {}) {
@@ -50,6 +51,28 @@ function userHeaders(cookie, userId, extra = {}) {
   };
 }
 
+function getRequestTimeoutMs() {
+  const configured = Number(process.env.HEZI_NEWAPI_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
+
+function withTimeout(options = {}) {
+  if (options.signal || typeof globalThis.AbortSignal?.timeout !== 'function') {
+    return options;
+  }
+  return {
+    ...options,
+    signal: globalThis.AbortSignal.timeout(getRequestTimeoutMs()),
+  };
+}
+
+async function newapiFetch(url, options) {
+  return fetch(url, withTimeout(options));
+}
+
 /** Generate a NewAPI-safe shadow password (alphanumeric, ≤16 chars). */
 function generateShadowPassword() {
   const alphabet = 'ABCDEFGHIJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -75,7 +98,7 @@ async function readJsonOrText(res) {
  * NewAPI returns `{ success: true, message: '', data: ... }` on success.
  */
 async function createShadowUser({ username, password, displayName }) {
-  const res = await fetch(`${BASE}/api/user/`, {
+  const res = await newapiFetch(`${BASE}/api/user/`, {
     method: 'POST',
     headers: adminHeaders(),
     body: JSON.stringify({
@@ -101,7 +124,7 @@ async function createShadowUser({ username, password, displayName }) {
 async function findShadowUserByUsername(username) {
   // Search up to 5 pages of 100 to catch up on a small instance.
   for (let page = 0; page < 5; page++) {
-    const res = await fetch(`${BASE}/api/user/?p=${page}&page_size=100`, {
+    const res = await newapiFetch(`${BASE}/api/user/?p=${page}&page_size=100`, {
       headers: adminHeaders(),
     });
     const { body, raw } = await readJsonOrText(res);
@@ -126,7 +149,7 @@ async function findShadowUserByUsername(username) {
  * Returns { cookie, userId }. Cookie is forwarded to subsequent user calls.
  */
 async function loginAsUser({ username, password }) {
-  const res = await fetch(`${BASE}/api/user/login`, {
+  const res = await newapiFetch(`${BASE}/api/user/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -218,7 +241,7 @@ function extractTokenItem(body, preferredName) {
 }
 
 async function getUserTokenKey({ cookie, userId, tokenId }) {
-  const res = await fetch(`${BASE}/api/token/${tokenId}/key`, {
+  const res = await newapiFetch(`${BASE}/api/token/${tokenId}/key`, {
     method: 'POST',
     headers: userHeaders(cookie, userId),
   });
@@ -242,7 +265,7 @@ async function getUserTokenKey({ cookie, userId, tokenId }) {
 }
 
 async function listUserTokens({ cookie, userId, name }) {
-  const res = await fetch(`${BASE}/api/token/?p=0&page_size=10`, {
+  const res = await newapiFetch(`${BASE}/api/token/?p=0&page_size=10`, {
     headers: userHeaders(cookie, userId),
   });
   const { body, raw } = await readJsonOrText(res);
@@ -270,7 +293,7 @@ async function listUserTokens({ cookie, userId, name }) {
  * returns only success=true, so we fall back to listing the user's tokens.
  */
 async function createUserToken({ cookie, userId, name, unlimited = true, expiredTime = -1 }) {
-  const res = await fetch(`${BASE}/api/token/`, {
+  const res = await newapiFetch(`${BASE}/api/token/`, {
     method: 'POST',
     headers: userHeaders(cookie, userId),
     body: JSON.stringify({
@@ -305,7 +328,7 @@ async function createUserToken({ cookie, userId, name, unlimited = true, expired
  * Best-effort: if quotaCode missing/invalid, callers may swallow the error.
  */
 async function redeemQuotaCode({ cookie, userId, code }) {
-  const res = await fetch(`${BASE}/api/user/topup`, {
+  const res = await newapiFetch(`${BASE}/api/user/topup`, {
     method: 'POST',
     headers: userHeaders(cookie, userId),
     body: JSON.stringify({ key: code }),
@@ -326,7 +349,7 @@ async function redeemQuotaCode({ cookie, userId, code }) {
  * Used by HeZi when LibreChat user is deleted.
  */
 async function deleteShadowUser(newapiUserId) {
-  const res = await fetch(`${BASE}/api/user/${newapiUserId}`, {
+  const res = await newapiFetch(`${BASE}/api/user/${newapiUserId}`, {
     method: 'DELETE',
     headers: adminHeaders(),
   });

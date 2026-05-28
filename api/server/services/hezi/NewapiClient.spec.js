@@ -28,6 +28,13 @@ describe('NewapiClient', () => {
     process.env.HEZI_NEWAPI_BASE_URL = 'https://newapi.test';
   });
 
+  afterEach(() => {
+    delete process.env.HEZI_NEWAPI_BASE_URL;
+    delete process.env.HEZI_NEWAPI_ADMIN_TOKEN;
+    delete process.env.HEZI_NEWAPI_ADMIN_USER_ID;
+    delete process.env.HEZI_NEWAPI_TIMEOUT_MS;
+  });
+
   test('fetches the created token key from the token list when create returns full key', async () => {
     mockFetch
       .mockResolvedValueOnce(jsonResponse({ success: true, message: '' }))
@@ -61,6 +68,7 @@ describe('NewapiClient', () => {
           Cookie: 'session=abc',
           'New-Api-User': '42',
         }),
+        signal: expect.any(AbortSignal),
       }),
     );
   });
@@ -105,7 +113,31 @@ describe('NewapiClient', () => {
           Cookie: 'session=abc',
           'New-Api-User': '42',
         }),
+        signal: expect.any(AbortSignal),
       }),
     );
+  });
+
+  test('adds a configured timeout signal to NewAPI requests', async () => {
+    process.env.HEZI_NEWAPI_ADMIN_TOKEN = 'admin-token';
+    process.env.HEZI_NEWAPI_ADMIN_USER_ID = '1';
+    process.env.HEZI_NEWAPI_TIMEOUT_MS = '1234';
+    const abortTimeoutSpy = jest.spyOn(globalThis.AbortSignal, 'timeout');
+    mockFetch.mockResolvedValue(jsonResponse({ success: true, message: '' }));
+    const { createShadowUser } = require('./NewapiClient');
+
+    await createShadowUser({
+      username: 'hezi_00ffeeddccbb',
+      password: 'Password2345678',
+      displayName: 'hezi_00ffeeddccbb',
+    });
+
+    expect(abortTimeoutSpy).toHaveBeenCalledWith(1234);
+    expect(mockFetch.mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    abortTimeoutSpy.mockRestore();
   });
 });

@@ -28,3 +28,4 @@ export { default as systemGrantSchema } from './systemGrant';
 export { default as configSchema } from './config';
 /* HeZi */
 export { default as inviteCodeSchema } from './inviteCode';
+export { default as heziProvisioningErrorSchema } from './heziProvisioningError';

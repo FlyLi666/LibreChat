@@ -18,27 +18,40 @@ const mockDeleteToolCalls = jest.fn();
 const mockDeleteUserAgents = jest.fn();
 const mockDeleteUserPrompts = jest.fn();
 const mockDeleteUserSkills = jest.fn();
+const mockCleanupShadowAccount = jest.fn();
 
-jest.mock('@librechat/data-schemas', () => ({
-  logger: { error: jest.fn(), info: jest.fn() },
-  webSearchKeys: [],
-}));
+jest.mock(
+  '@librechat/data-schemas',
+  () => ({
+    logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+    webSearchKeys: [],
+  }),
+  { virtual: true },
+);
 
-jest.mock('librechat-data-provider', () => ({
-  Tools: {},
-  CacheKeys: {},
-  Constants: { mcp_delimiter: '::', mcp_prefix: 'mcp_' },
-  FileSources: {},
-}));
+jest.mock(
+  'librechat-data-provider',
+  () => ({
+    Tools: {},
+    CacheKeys: {},
+    Constants: { mcp_delimiter: '::', mcp_prefix: 'mcp_' },
+    FileSources: {},
+  }),
+  { virtual: true },
+);
 
-jest.mock('@librechat/api', () => ({
-  MCPOAuthHandler: {},
-  MCPTokenStorage: {},
-  normalizeHttpError: jest.fn(),
-  extractWebSearchEnvVars: jest.fn(),
-  needsRefresh: jest.fn(),
-  getNewS3URL: jest.fn(),
-}));
+jest.mock(
+  '@librechat/api',
+  () => ({
+    MCPOAuthHandler: {},
+    MCPTokenStorage: {},
+    normalizeHttpError: jest.fn(),
+    extractWebSearchEnvVars: jest.fn(),
+    needsRefresh: jest.fn(),
+    getNewS3URL: jest.fn(),
+  }),
+  { virtual: true },
+);
 
 jest.mock('~/models', () => ({
   deleteAllUserSessions: (...args) => mockDeleteAllUserSessions(...args),
@@ -74,6 +87,10 @@ jest.mock('~/models', () => ({
 jest.mock('~/server/services/PluginService', () => ({
   updateUserPluginAuth: jest.fn(),
   deleteUserPluginAuth: (...args) => mockDeleteUserPluginAuth(...args),
+}));
+
+jest.mock('~/server/services/hezi/HeziProvisioning', () => ({
+  cleanupShadowAccount: (...args) => mockCleanupShadowAccount(...args),
 }));
 
 jest.mock('~/server/services/twoFactorService', () => ({
@@ -133,6 +150,7 @@ function stubDeletionMocks() {
   mockDeleteUserAgents.mockResolvedValue();
   mockDeleteUserPrompts.mockResolvedValue();
   mockDeleteUserSkills.mockResolvedValue(0);
+  mockCleanupShadowAccount.mockResolvedValue(true);
 }
 
 beforeEach(() => {
@@ -155,6 +173,33 @@ describe('deleteUserController - 2FA enforcement', () => {
     expect(mockDeleteUserPrompts).toHaveBeenCalledWith('user1');
     expect(mockDeleteUserSkills).toHaveBeenCalledWith('user1');
     expect(mockVerifyOTPOrBackupCode).not.toHaveBeenCalled();
+  });
+
+  it('cleans the NewAPI shadow account before deleting local plugin auth', async () => {
+    const req = { user: { id: 'user1', _id: 'user1', email: 'a@b.com' }, body: {} };
+    const res = createRes();
+    mockGetUserById.mockResolvedValue({ _id: 'user1', twoFactorEnabled: false });
+
+    await deleteUserController(req, res);
+
+    expect(mockCleanupShadowAccount).toHaveBeenCalledWith('user1');
+    expect(mockCleanupShadowAccount.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDeleteUserPluginAuth.mock.invocationCallOrder[0],
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('still deletes the local account when NewAPI shadow cleanup rejects', async () => {
+    const req = { user: { id: 'user1', _id: 'user1', email: 'a@b.com' }, body: {} };
+    const res = createRes();
+    mockGetUserById.mockResolvedValue({ _id: 'user1', twoFactorEnabled: false });
+    mockCleanupShadowAccount.mockRejectedValue(new Error('cleanup regression'));
+
+    await deleteUserController(req, res);
+
+    expect(mockDeleteUserPluginAuth).toHaveBeenCalledWith('user1', null, true);
+    expect(mockDeleteUserById).toHaveBeenCalledWith('user1');
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it('proceeds with deletion when user has no 2FA record', async () => {
