@@ -1,11 +1,21 @@
+const { fetch: mockFetch } = require('undici');
 const {
   getImageModels,
+  getLiveImageModels,
   mapImageRequestPayload,
   normalizeImageResponse,
   runImageGeneration,
 } = require('./ImageGenerationService');
 
+jest.mock('undici', () => ({
+  fetch: jest.fn(),
+}));
+
 describe('ImageGenerationService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('exposes gpt-image-2 as the default OpenAI model with size schema', () => {
     const models = getImageModels();
     const model = models.find((item) => item.modelId === 'gpt-image-2');
@@ -99,5 +109,39 @@ describe('ImageGenerationService', () => {
         getUserKeyValues: jest.fn().mockResolvedValue(null),
       }),
     ).rejects.toThrow('IMAGE_NO_USER_KEY');
+  });
+
+  it('marks registered image models missing from NewAPI /v1/models as disabled', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          data: [{ id: 'gemini-3.1-flash-image-preview' }, { id: 'dall-e-3' }],
+        }),
+    });
+
+    const models = await getLiveImageModels({
+      userId: 'user-1',
+      getUserKeyValues: jest.fn().mockResolvedValue({
+        apiKey: 'sk-user',
+        baseURL: 'https://newapi.example.com/v1',
+      }),
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://newapi.example.com/v1/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-user' }),
+      }),
+    );
+    expect(
+      models.find((model) => model.modelId === 'gemini-3.1-flash-image-preview'),
+    ).toMatchObject({
+      disabled: false,
+    });
+    expect(models.find((model) => model.modelId === 'gpt-image-2')).toMatchObject({
+      disabled: true,
+      reason: 'not_configured',
+    });
   });
 });

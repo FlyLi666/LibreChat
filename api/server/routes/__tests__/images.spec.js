@@ -20,6 +20,7 @@ const mockDb = {
 const mockImageService = {
   getImageModel: jest.fn(),
   getImageModels: jest.fn(),
+  getLiveImageModels: jest.fn(),
   runImageGeneration: jest.fn(),
 };
 const mockImageAssetStorage = {
@@ -74,6 +75,9 @@ describe('image generation routes', () => {
     mockImageService.getImageModels.mockReturnValue([
       { provider: 'openai', modelId: 'gpt-image-2', disabled: false },
     ]);
+    mockImageService.getLiveImageModels.mockResolvedValue([
+      { provider: 'openai', modelId: 'gpt-image-2', disabled: false },
+    ]);
     mockImageAssetStorage.persistGeneratedImageAsset.mockImplementation(async ({ image }) => ({
       asset: image,
       fileId: undefined,
@@ -88,7 +92,10 @@ describe('image generation routes', () => {
     expect(response.body.models).toEqual([
       { provider: 'openai', modelId: 'gpt-image-2', disabled: false },
     ]);
-    expect(mockImageService.getImageModels).toHaveBeenCalledTimes(1);
+    expect(mockImageService.getLiveImageModels).toHaveBeenCalledWith({
+      userId: 'user-123',
+      getUserKeyValues: mockDb.getUserKeyValues,
+    });
   });
 
   it('creates a topic, returns pending generations, and completes in the background', async () => {

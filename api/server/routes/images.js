@@ -3,8 +3,8 @@ const { logger, isValidObjectIdString } = require('@librechat/data-schemas');
 const { requireJwtAuth, configMiddleware } = require('~/server/middleware');
 const db = require('~/models');
 const {
-  getImageModels,
   getImageModel,
+  getLiveImageModels,
   runImageGeneration,
 } = require('~/server/services/hezi/ImageGenerationService');
 const { persistGeneratedImageAsset } = require('~/server/services/hezi/ImageAssetStorage');
@@ -165,8 +165,12 @@ async function recoverPendingImageGenerationJobs({ appConfig, limit = 25 } = {})
   return { found: pendingBatches.length, queued };
 }
 
-router.get('/models', (_req, res) => {
-  res.json({ models: getImageModels() });
+router.get('/models', async (req, res) => {
+  const models = await getLiveImageModels({
+    userId: getUserId(req),
+    getUserKeyValues: db.getUserKeyValues,
+  });
+  res.json({ models });
 });
 
 router.get('/topics', async (req, res) => {

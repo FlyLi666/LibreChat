@@ -4,6 +4,7 @@ const { HEZI_ENDPOINT_NAME } = require('./HeziProvisioning');
 
 const DEFAULT_BASE_URL = 'https://newapi.flyli.cn/v1';
 const DEFAULT_TIMEOUT_MS = 90_000;
+const DEFAULT_MODELS_TIMEOUT_MS = 10_000;
 
 const imageModels = [
   {
@@ -174,6 +175,29 @@ function getImageModels({ includeDisabled = true } = {}) {
   return includeDisabled ? imageModels : imageModels.filter((model) => !model.disabled);
 }
 
+function cloneImageModel(model) {
+  return {
+    ...model,
+    paramSchemas: model.paramSchemas.map((schema) => ({ ...schema })),
+  };
+}
+
+function mergeLiveModelAvailability(modelIds, { includeDisabled = true } = {}) {
+  const available = new Set(modelIds);
+  const models = imageModels.map((model) => {
+    const next = cloneImageModel(model);
+    if (available.has(model.modelId)) {
+      delete next.reason;
+      next.disabled = false;
+      return next;
+    }
+    next.disabled = true;
+    next.reason = 'not_configured';
+    return next;
+  });
+  return includeDisabled ? models : models.filter((model) => !model.disabled);
+}
+
 function getImageModel(modelId) {
   return imageModels.find((model) => model.modelId === modelId);
 }
@@ -249,9 +273,81 @@ function getNewapiTimeoutMs() {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TIMEOUT_MS;
 }
 
+function getNewapiModelsTimeoutMs() {
+  const configured = Number(process.env.HEZI_IMAGE_MODELS_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MODELS_TIMEOUT_MS;
+}
+
 function getDefaultBaseUrl() {
   const base = (process.env.HEZI_NEWAPI_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
   return base.endsWith('/v1') ? base : `${base}/v1`;
+}
+
+function normalizeModelIds(body) {
+  let items = [];
+  if (Array.isArray(body?.data)) {
+    items = body.data;
+  } else if (Array.isArray(body)) {
+    items = body;
+  }
+  return items
+    .map((item) => (typeof item === 'string' ? item : item?.id || item?.model || item?.modelId))
+    .filter(Boolean)
+    .map(String);
+}
+
+async function getEndpointKeyValues({ userId, getUserKeyValues }) {
+  return (await getUserKeyValues({ userId: String(userId), name: HEZI_ENDPOINT_NAME })) || {};
+}
+
+async function getLiveImageModels({ userId, getUserKeyValues, includeDisabled = true }) {
+  let values = {};
+  try {
+    values = await getEndpointKeyValues({ userId, getUserKeyValues });
+  } catch (error) {
+    logger.warn('[HeZiImageGeneration] failed to load user NewAPI key for model probing', {
+      userId: String(userId),
+      error: error.message,
+    });
+    return getImageModels({ includeDisabled });
+  }
+
+  const apiKey = values.apiKey;
+  const baseURL = (values.baseURL || getDefaultBaseUrl()).replace(/\/+$/, '');
+  if (!apiKey) {
+    return getImageModels({ includeDisabled });
+  }
+
+  try {
+    const response = await fetch(`${baseURL}/models`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(getNewapiModelsTimeoutMs()),
+    });
+    const text = await response.text();
+    let body = null;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { raw: text };
+    }
+    if (!response.ok) {
+      logger.warn('[HeZiImageGeneration] NewAPI model probing failed', {
+        status: response.status,
+        body,
+      });
+      return getImageModels({ includeDisabled });
+    }
+    return mergeLiveModelAvailability(normalizeModelIds(body), { includeDisabled });
+  } catch (error) {
+    logger.warn('[HeZiImageGeneration] NewAPI model probing request failed', {
+      error: error.message,
+    });
+    return getImageModels({ includeDisabled });
+  }
 }
 
 async function runImageGeneration({
@@ -270,8 +366,7 @@ async function runImageGeneration({
   if (modelDef.disabled) {
     throw new Error('IMAGE_MODEL_DISABLED');
   }
-  const values =
-    (await getUserKeyValues({ userId: String(userId), name: HEZI_ENDPOINT_NAME })) || {};
+  const values = await getEndpointKeyValues({ userId, getUserKeyValues });
   const apiKey = values.apiKey;
   const baseURL = (values.baseURL || getDefaultBaseUrl()).replace(/\/+$/, '');
   if (!apiKey) {
@@ -312,6 +407,7 @@ async function runImageGeneration({
 module.exports = {
   getImageModels,
   getImageModel,
+  getLiveImageModels,
   mapImageRequestPayload,
   normalizeImageResponse,
   runImageGeneration,
