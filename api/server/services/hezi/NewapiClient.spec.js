@@ -82,7 +82,7 @@ describe('NewapiClient', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           success: true,
-          data: { key: 'sk-created-full' },
+          data: { key: 'rawCreatedFullKey123' },
         }),
       );
 
@@ -94,7 +94,7 @@ describe('NewapiClient', () => {
         userId: 42,
         name: 'hezi-default',
       }),
-    ).resolves.toBe('sk-created-full');
+    ).resolves.toBe('sk-rawCreatedFullKey123');
 
     expect(mockFetch).toHaveBeenNthCalledWith(
       3,

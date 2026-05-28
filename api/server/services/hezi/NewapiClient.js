@@ -163,11 +163,13 @@ async function loginAsUser({ username, password }) {
 
 function extractTokenKey(body, preferredName) {
   const data = body?.data;
-  if (typeof data === 'string' && data.startsWith('sk-')) {
-    return data;
+  const stringKey = normalizeTokenKey(data);
+  if (stringKey) {
+    return stringKey;
   }
-  if (data?.key?.startsWith?.('sk-')) {
-    return data.key;
+  const objectKey = normalizeTokenKey(data?.key);
+  if (objectKey) {
+    return objectKey;
   }
 
   let items = [];
@@ -178,12 +180,27 @@ function extractTokenKey(body, preferredName) {
   }
 
   const preferred = items.find(
-    (item) => item?.name === preferredName && item?.key?.startsWith?.('sk-'),
+    (item) => item?.name === preferredName && normalizeTokenKey(item?.key),
   );
   if (preferred) {
-    return preferred.key;
+    return normalizeTokenKey(preferred.key);
   }
-  return items.find((item) => item?.key?.startsWith?.('sk-'))?.key || null;
+  const token = items.find((item) => normalizeTokenKey(item?.key));
+  return normalizeTokenKey(token?.key);
+}
+
+function normalizeTokenKey(key) {
+  if (typeof key !== 'string') {
+    return null;
+  }
+  const trimmed = key.trim();
+  if (!trimmed || trimmed.includes('*')) {
+    return null;
+  }
+  if (trimmed.startsWith('sk-')) {
+    return trimmed;
+  }
+  return `sk-${trimmed}`;
 }
 
 function extractTokenItem(body, preferredName) {
@@ -213,8 +230,8 @@ async function getUserTokenKey({ cookie, userId, tokenId }) {
       code: 'GET_TOKEN_KEY_FAILED',
     });
   }
-  const key = body?.data?.key;
-  if (typeof key === 'string' && key.startsWith('sk-')) {
+  const key = normalizeTokenKey(body?.data?.key);
+  if (key) {
     return key;
   }
   throw new NewapiError('getUserTokenKey returned no sk- key', {
