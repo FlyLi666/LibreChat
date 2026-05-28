@@ -9,6 +9,7 @@ import type {
 import { Button } from '@librechat/client';
 import {
   useGenerateImageMutation,
+  useDeleteImageGenerationMutation,
   useImageBatchesQuery,
   useImageModelsQuery,
   useImageTopicsQuery,
@@ -50,6 +51,23 @@ export function mergeImageBatches(inlineBatches: TImageBatch[], remoteBatches: T
     ...inlineBatches.map((batch) => remoteById.get(batch._id) ?? batch),
     ...remoteBatches.filter((batch) => !inlineIds.has(batch._id)),
   ];
+}
+
+export function filterDeletedGenerations(
+  batches: TImageBatch[],
+  deletedGenerationIds: ReadonlySet<string>,
+) {
+  if (deletedGenerationIds.size === 0) {
+    return batches;
+  }
+  return batches
+    .map((batch) => ({
+      ...batch,
+      generations: batch.generations.filter(
+        (generation) => !deletedGenerationIds.has(generation._id),
+      ),
+    }))
+    .filter((batch) => batch.generations.length > 0);
 }
 
 function getSchemaLabel(schema: TImageParamSchema, localize: ReturnType<typeof useLocalize>) {
@@ -157,7 +175,15 @@ function TopicSidebar({
   );
 }
 
-function GenerationCard({ batch }: { batch: TImageBatch }) {
+function GenerationCard({
+  batch,
+  onDeleteGeneration,
+  deleting,
+}: {
+  batch: TImageBatch;
+  onDeleteGeneration: (generationId: string) => void;
+  deleting: boolean;
+}) {
   const localize = useLocalize();
 
   return (
@@ -167,27 +193,41 @@ function GenerationCard({ batch }: { batch: TImageBatch }) {
           <p className="text-sm font-medium text-text-primary">{batch.prompt}</p>
           <p className="mt-1 text-xs text-text-tertiary">{batch.model}</p>
         </div>
-        <div className="flex gap-1 text-text-secondary">
-          <Button size="icon" variant="ghost" aria-label={localize('com_image_action_zoom')}>
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" aria-label={localize('com_image_action_download')}>
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" aria-label={localize('com_image_action_recreate')}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" aria-label={localize('com_image_action_delete')}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {batch.generations.map((generation) => (
           <div
             key={generation._id}
-            className="aspect-square overflow-hidden rounded-lg bg-surface-secondary"
+            className="group relative aspect-square overflow-hidden rounded-lg bg-surface-secondary"
           >
+            <div className="bg-surface-primary/90 absolute right-2 top-2 z-10 flex gap-1 rounded-lg p-1 opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+              <Button size="icon" variant="ghost" aria-label={localize('com_image_action_zoom')}>
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={localize('com_image_action_download')}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={localize('com_image_action_recreate')}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={localize('com_image_action_delete')}
+                disabled={deleting}
+                onClick={() => onDeleteGeneration(generation._id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
             {generation.status === 'pending' && (
               <div className="flex h-full items-center justify-center text-sm text-text-secondary">
                 生成中...
@@ -264,6 +304,7 @@ export default function ImagePage() {
     isError: batchesError,
   } = useImageBatchesQuery(activeTopicId, { refetchInterval: activeTopicId ? 3000 : false });
   const generateMutation = useGenerateImageMutation();
+  const deleteGenerationMutation = useDeleteImageGenerationMutation();
   const localModels = useMemo(() => getLocalImageModels(), []);
   const models = remoteModels?.length ? remoteModels : localModels;
   const [modelId, setModelId] = useState('gpt-image-2');
@@ -274,6 +315,7 @@ export default function ImagePage() {
   const [params, setParams] = useState<Params>(() => getDefaultImageParams(model));
   const [prompt, setPrompt] = useState('');
   const [inlineBatches, setInlineBatches] = useState<TImageBatch[]>([]);
+  const [deletedGenerationIds, setDeletedGenerationIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (!activeTopicId && topics[0]?._id) {
@@ -288,8 +330,11 @@ export default function ImagePage() {
   }, [model?.modelId]);
 
   const displayedBatches = useMemo(() => {
-    return mergeImageBatches(inlineBatches, batches);
-  }, [batches, inlineBatches]);
+    return filterDeletedGenerations(
+      mergeImageBatches(inlineBatches, batches),
+      deletedGenerationIds,
+    );
+  }, [batches, deletedGenerationIds, inlineBatches]);
 
   const upsertInlineBatch = (batch: TImageBatch | undefined) => {
     if (!batch) {
@@ -301,6 +346,7 @@ export default function ImagePage() {
   const startNewTopic = () => {
     setActiveTopicId(null);
     setInlineBatches([]);
+    setDeletedGenerationIds(new Set());
     setPrompt('');
   };
 
@@ -339,6 +385,15 @@ export default function ImagePage() {
     }
   };
 
+  const deleteGeneration = async (generationId: string) => {
+    await deleteGenerationMutation.mutateAsync(generationId);
+    setDeletedGenerationIds((prev) => {
+      const next = new Set(prev);
+      next.add(generationId);
+      return next;
+    });
+  };
+
   const renderWorkspace = () => {
     if (modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches) {
       return (
@@ -372,7 +427,12 @@ export default function ImagePage() {
     return (
       <div className="mx-auto grid max-w-4xl gap-4">
         {displayedBatches.map((batch) => (
-          <GenerationCard key={batch._id} batch={batch} />
+          <GenerationCard
+            key={batch._id}
+            batch={batch}
+            deleting={deleteGenerationMutation.isLoading}
+            onDeleteGeneration={deleteGeneration}
+          />
         ))}
       </div>
     );

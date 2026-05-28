@@ -2,10 +2,13 @@ import React from 'react';
 import '@testing-library/jest-dom/extend-expect';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { TImageBatch } from 'librechat-data-provider';
 import ImagePage, { mergeImageBatches } from '../ImagePage';
 
 const mockGenerateImage = jest.fn();
+const mockDeleteImageGeneration = jest.fn();
 let mockBatchesLoading = false;
+let mockBatches: unknown[] = [];
 
 jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) =>
@@ -15,6 +18,7 @@ jest.mock('~/hooks', () => ({
       com_image_model: 'Model',
       com_image_prompt_placeholder: '描述你想画的内容...',
       com_image_generate: '生成',
+      com_image_action_delete: '删除',
       com_image_config_size: '尺寸',
       com_image_config_aspect: '比例',
       com_image_config_resolution: '分辨率',
@@ -50,9 +54,13 @@ jest.mock('~/data-provider/Images', () => ({
     ],
   }),
   useImageTopicsQuery: () => ({ data: [] }),
-  useImageBatchesQuery: () => ({ data: [], isLoading: mockBatchesLoading }),
+  useImageBatchesQuery: () => ({ data: mockBatches, isLoading: mockBatchesLoading }),
   useGenerateImageMutation: () => ({
     mutateAsync: mockGenerateImage,
+    isLoading: false,
+  }),
+  useDeleteImageGenerationMutation: () => ({
+    mutateAsync: mockDeleteImageGeneration,
     isLoading: false,
   }),
 }));
@@ -71,6 +79,9 @@ describe('ImagePage', () => {
   beforeEach(() => {
     mockGenerateImage.mockReset();
     mockGenerateImage.mockResolvedValue({});
+    mockDeleteImageGeneration.mockReset();
+    mockDeleteImageGeneration.mockResolvedValue(undefined);
+    mockBatches = [];
     mockBatchesLoading = false;
   });
 
@@ -85,16 +96,22 @@ describe('ImagePage', () => {
   });
 
   it('prefers refreshed remote batches over matching inline pending batches', () => {
-    const pendingBatch = {
+    const pendingBatch: TImageBatch = {
       _id: 'batch-1',
+      topicId: 'topic-1',
+      provider: 'openai',
       prompt: '画一只穿宇航服的猫',
       model: 'gpt-image-2',
+      params: {},
       generations: [{ _id: 'generation-1', status: 'pending' }],
     };
-    const succeededBatch = {
+    const succeededBatch: TImageBatch = {
       _id: 'batch-1',
+      topicId: 'topic-1',
+      provider: 'openai',
       prompt: '画一只穿宇航服的猫',
       model: 'gpt-image-2',
+      params: {},
       generations: [
         {
           _id: 'generation-1',
@@ -186,5 +203,35 @@ describe('ImagePage', () => {
 
     expect(screen.getByPlaceholderText('描述你想画的内容...')).toHaveValue('');
     expect(screen.queryByText('当前模型暂不可用，请换一个')).not.toBeInTheDocument();
+  });
+
+  it('deletes a generated image from the feed', async () => {
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '画一只穿宇航服的猫',
+        params: {},
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/cat.png' },
+          },
+        ],
+      },
+    ];
+    renderPage();
+
+    expect(screen.getByAltText('画一只穿宇航服的猫')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+
+    await waitFor(() => {
+      expect(mockDeleteImageGeneration).toHaveBeenCalledWith('generation-1');
+      expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
   });
 });
