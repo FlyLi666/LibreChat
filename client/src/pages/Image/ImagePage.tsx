@@ -57,15 +57,13 @@ export function filterDeletedGenerations(
   batches: TImageBatch[],
   deletedGenerationIds: ReadonlySet<string>,
 ) {
-  if (deletedGenerationIds.size === 0) {
-    return batches;
-  }
   return batches
     .map((batch) => ({
       ...batch,
-      generations: batch.generations.filter(
-        (generation) => !deletedGenerationIds.has(generation._id),
-      ),
+      generations:
+        deletedGenerationIds.size === 0
+          ? batch.generations
+          : batch.generations.filter((generation) => !deletedGenerationIds.has(generation._id)),
     }))
     .filter((batch) => batch.generations.length > 0);
 }
