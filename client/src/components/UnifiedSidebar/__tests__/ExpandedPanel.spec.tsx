@@ -60,6 +60,12 @@ const createLinks = () => [
     icon: NotebookPen,
     id: 'prompts',
   },
+  {
+    title: 'com_nav_image_gen' as const,
+    icon: NotebookPen,
+    id: 'image',
+    onClick: jest.fn(),
+  },
 ];
 
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -134,6 +140,14 @@ describe('ExpandedPanel', () => {
       fireEvent.click(inactiveButton);
       expect(onExpand).toHaveBeenCalledTimes(1);
       expect(localStorage.getItem('side:active-panel')).toBe('prompts');
+    });
+
+    it('collapses the secondary panel after clicking a full-page nav item', () => {
+      const { onCollapse } = renderPanel({ expanded: true });
+
+      fireEvent.click(screen.getByRole('button', { name: 'com_nav_image_gen' }));
+
+      expect(onCollapse).toHaveBeenCalledTimes(1);
     });
   });
 

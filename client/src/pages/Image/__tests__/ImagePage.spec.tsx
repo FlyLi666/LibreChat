@@ -1,4 +1,5 @@
 import React from 'react';
+import { RecoilRoot } from 'recoil';
 import '@testing-library/jest-dom/extend-expect';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -37,6 +38,8 @@ jest.mock('~/hooks', () => ({
       com_image_config_image_num: '数量',
       com_image_reference_image: '参考图',
       com_image_new_topic: '新建主题',
+      com_nav_image_gen: '生图',
+      com_nav_open_sidebar: '打开侧边栏',
     })[key] ?? key,
 }));
 
@@ -114,7 +117,9 @@ function renderPage() {
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <ImagePage />
+      <RecoilRoot>
+        <ImagePage />
+      </RecoilRoot>
     </QueryClientProvider>,
   );
 }
@@ -178,6 +183,13 @@ describe('ImagePage', () => {
     expect(screen.getAllByText('尺寸').length).toBeGreaterThan(0);
     expect(screen.getAllByText('质量').length).toBeGreaterThan(0);
     expect(screen.getAllByText('数量').length).toBeGreaterThan(0);
+  });
+
+  it('renders a mobile-safe sidebar opener', () => {
+    renderPage();
+
+    expect(screen.getByTestId('open-sidebar-button')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '生图' })).toBeInTheDocument();
   });
 
   it('uses the startup-configured image model as the default selection', () => {

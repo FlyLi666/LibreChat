@@ -22,6 +22,7 @@ import {
 import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn, triggerDownload } from '~/utils';
+import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import {
   getDefaultImageParams,
   getImageModels as getLocalImageModels,
@@ -749,6 +750,12 @@ export default function ImagePage() {
         deleting={deleteTopicMutation.isLoading}
       />
       <main className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border-light bg-surface-primary px-3 md:hidden">
+          <OpenSidebar />
+          <h1 className="min-w-0 truncate text-sm font-semibold text-text-primary">
+            {localize('com_nav_image_gen')}
+          </h1>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">{renderWorkspace()}</div>
         <div className="border-t border-border-light bg-surface-primary px-4 py-3 md:px-6">
           <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-lg border border-border-light bg-surface-primary-alt p-3">
