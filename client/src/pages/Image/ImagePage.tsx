@@ -1,5 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, ImagePlus, Maximize2, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  Download,
+  Home,
+  ImageIcon,
+  ImagePlus,
+  Lightbulb,
+  Maximize2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Settings2,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { v4 } from 'uuid';
 import type {
   TImageBatch,
@@ -29,6 +47,9 @@ import {
 } from '~/components/Image/modelParams';
 
 type Params = Record<string, unknown>;
+type ImageStartupConfig = {
+  imageGenDefaultModel?: string;
+};
 
 const schemaLabelFallbacks: Record<string, string> = {
   aspectRatio: 'com_image_config_aspect',
@@ -41,6 +62,9 @@ const schemaLabelFallbacks: Record<string, string> = {
   steps: 'com_image_config_steps',
   strength: 'com_image_config_strength',
 };
+
+const imageCreateTitle = '即刻创作';
+const imageModeLabel = '图片';
 
 function startOfLocalDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -200,7 +224,14 @@ function TopicSidebar({
   deleting: boolean;
 }) {
   const localize = useLocalize();
-  const groups = groupTopics(topics);
+  const [query, setQuery] = useState('');
+  const filteredTopics = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) {
+      return topics;
+    }
+    return topics.filter((topic) => topic.title.toLowerCase().includes(keyword));
+  }, [query, topics]);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
 
@@ -224,55 +255,86 @@ function TopicSidebar({
     cancelRename();
   };
 
+  const topicLabel = `图片主题 ${filteredTopics.length}`;
+
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border-light bg-surface-primary-alt lg:flex lg:flex-col">
-      <div className="border-b border-border-light p-3">
-        <Button variant="outline" size="sm" className="w-full justify-start" onClick={onNewTopic}>
-          {localize('com_image_new_topic')}
+    <aside className="hidden w-[448px] shrink-0 border-r border-border-light bg-[#f7f7f8] text-text-primary lg:flex lg:flex-col">
+      <div className="flex h-16 items-center justify-between border-b border-border-light px-5">
+        <div className="flex items-center gap-2 text-sm font-medium text-text-secondary">
+          <Home className="h-4 w-4" />
+          <ChevronDown className="h-3.5 w-3.5 -rotate-90 text-text-tertiary" />
+          <span className="text-text-primary">{imageModeLabel}</span>
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 rounded-lg text-text-tertiary"
+          aria-label="收起图片侧栏"
+        >
+          <ChevronLeft className="h-4 w-4" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {groups.map((group) => (
-          <section key={group.label} className="mb-4">
-            <h2 className="mb-1 px-2 text-xs font-semibold text-text-tertiary">{group.label}</h2>
-            <div className="grid gap-1">
-              {group.topics.map((topic) => (
-                <div
-                  key={topic._id}
-                  className={cn(
-                    'group flex items-center gap-1 rounded-lg px-1 py-1 text-sm transition-colors hover:bg-surface-hover',
-                    topic._id === activeTopicId
-                      ? 'bg-surface-active-alt text-text-primary'
-                      : 'text-text-secondary',
-                  )}
-                >
-                  {editingTopicId === topic._id ? (
-                    <input
-                      className="min-w-0 flex-1 rounded-md border border-border-light bg-surface-primary px-2 py-1 text-sm text-text-primary outline-none"
-                      value={editingTitle}
-                      onBlur={() => void saveRename(topic)}
-                      onChange={(event) => setEditingTitle(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          void saveRename(topic);
-                        }
-                        if (event.key === 'Escape') {
-                          cancelRename();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <button
-                      className="min-w-0 flex-1 rounded-md px-1 py-1 text-left"
-                      onClick={() => onSelect(topic._id)}
-                    >
-                      <span className="line-clamp-1">{topic.title}</span>
-                    </button>
-                  )}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+        <button
+          className="flex h-11 items-center gap-3 rounded-xl px-1 text-left text-[15px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+          onClick={onNewTopic}
+        >
+          <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-white">
+            <Plus className="h-4 w-4" />
+          </span>
+          <span>{localize('com_image_new_topic')}</span>
+        </button>
+        <label className="flex h-11 items-center gap-3 rounded-xl px-1 text-[15px] text-text-tertiary">
+          <Search className="h-5 w-5" />
+          <input
+            className="min-w-0 flex-1 bg-transparent text-text-primary outline-none placeholder:text-text-tertiary"
+            placeholder="搜索"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <section className="min-h-0">
+          <div className="mb-6 flex items-center gap-2 text-sm font-medium text-text-tertiary">
+            <span>{topicLabel}</span>
+            <ChevronDown className="h-4 w-4" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {filteredTopics.map((topic) => (
+              <div key={topic._id} className="group relative">
+                {editingTopicId === topic._id ? (
+                  <input
+                    className="aspect-square w-full rounded-xl border border-border-medium bg-white px-2 text-center text-sm font-medium text-text-primary outline-none"
+                    value={editingTitle}
+                    onBlur={() => void saveRename(topic)}
+                    onChange={(event) => setEditingTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        void saveRename(topic);
+                      }
+                      if (event.key === 'Escape') {
+                        cancelRename();
+                      }
+                    }}
+                  />
+                ) : (
+                  <button
+                    className={cn(
+                      'flex aspect-square w-full items-center justify-center rounded-xl border text-center text-3xl font-semibold transition-all',
+                      topic._id === activeTopicId
+                        ? 'border-border-medium bg-white text-text-primary shadow-sm ring-2 ring-black/5'
+                        : 'border-transparent bg-[#e9e9ea] text-black hover:bg-white hover:shadow-sm',
+                    )}
+                    title={topic.title}
+                    onClick={() => onSelect(topic._id)}
+                  >
+                    <span className="line-clamp-2 px-2">{topic.title || '未命名'}</span>
+                  </button>
+                )}
+                <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="size-7 opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+                    className="size-7 rounded-lg bg-white/90 shadow-sm"
                     aria-label={localize('com_ui_rename')}
                     disabled={renaming || editingTopicId === topic._id}
                     onClick={() => beginRename(topic)}
@@ -282,7 +344,7 @@ function TopicSidebar({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="size-7 opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+                    className="size-7 rounded-lg bg-white/90 shadow-sm"
                     aria-label={localize('com_image_action_delete')}
                     disabled={deleting}
                     onClick={() => void onDeleteTopic(topic._id)}
@@ -290,10 +352,10 @@ function TopicSidebar({
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              ))}
-            </div>
-          </section>
-        ))}
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </aside>
   );
@@ -429,45 +491,56 @@ function GenerationCard({
   );
 }
 
-function ModelInspector({
+function PromptComposer({
   model,
+  models,
+  modelId,
   params,
+  prompt,
   referenceFile,
   supportsReferenceImage,
+  generating,
+  uploading,
+  onModelChange,
+  onPromptChange,
   onReferenceFileChange,
   onClearReferenceFile,
   onParamChange,
+  onSubmit,
 }: {
   model: TImageModel | undefined;
+  models: TImageModel[];
+  modelId: string;
   params: Params;
+  prompt: string;
   referenceFile: File | null;
   supportsReferenceImage: boolean;
+  generating: boolean;
+  uploading: boolean;
+  onModelChange: (modelId: string) => void;
+  onPromptChange: (prompt: string) => void;
   onReferenceFileChange: (file: File | null) => void;
   onClearReferenceFile: () => void;
   onParamChange: (name: string, value: unknown) => void;
+  onSubmit: () => void;
 }) {
   const localize = useLocalize();
+  const [configOpen, setConfigOpen] = useState(false);
+  const paramSchemas = (model?.paramSchemas ?? []).filter((schema) => schema.name !== 'imageUrls');
+  const disabled = !prompt.trim() || generating || uploading;
 
   return (
-    <aside className="hidden w-72 shrink-0 border-l border-border-light bg-surface-primary-alt p-4 xl:block">
-      <h2 className="text-sm font-semibold text-text-primary">
-        {model?.displayName || localize('com_image_model')}
-      </h2>
-      <div className="mt-4 grid gap-3">
-        {(model?.paramSchemas ?? []).map((schema) => (
-          <ParamControl
-            key={schema.name}
-            schema={schema}
-            value={params[schema.name]}
-            onChange={(value) => onParamChange(schema.name, value)}
-          />
-        ))}
-      </div>
-      {supportsReferenceImage ? (
-        <div className="mt-5 rounded-lg border border-dashed border-border-medium p-3 text-sm text-text-secondary">
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-text-primary hover:bg-surface-hover">
-            <ImagePlus className="h-4 w-4" />
-            <span>{localize('com_image_reference_image')}</span>
+    <div className="mx-auto w-full max-w-[1050px] rounded-2xl border border-border-light bg-white p-2 shadow-[0_8px_28px_rgba(0,0,0,0.06)]">
+      <div className="flex min-h-[104px] gap-3 p-1">
+        {supportsReferenceImage ? (
+          <label className="flex size-[88px] shrink-0 cursor-pointer items-center justify-center rounded-xl bg-[#f5f5f5] text-text-tertiary transition-colors hover:bg-surface-hover">
+            {referenceFile ? (
+              <span className="line-clamp-3 px-2 text-center text-xs text-text-secondary">
+                {referenceFile.name}
+              </span>
+            ) : (
+              <Plus className="h-7 w-7" />
+            )}
             <input
               className="sr-only"
               type="file"
@@ -476,25 +549,107 @@ function ModelInspector({
               onChange={(event) => onReferenceFileChange(event.target.files?.[0] ?? null)}
             />
           </label>
-          {referenceFile && (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-surface-primary px-3 py-2">
-              <span className="min-w-0 truncate text-xs text-text-secondary">
-                {referenceFile.name}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7 shrink-0"
-                aria-label={localize('com_image_action_delete')}
-                onClick={onClearReferenceFile}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+        ) : null}
+        <textarea
+          className="min-h-[96px] min-w-0 flex-1 resize-none bg-transparent px-1 py-3 text-[15px] text-text-primary outline-none placeholder:text-text-tertiary"
+          placeholder="描述你想要生成的内容"
+          value={prompt}
+          onChange={(event) => onPromptChange(event.target.value)}
+        />
+        {referenceFile ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 shrink-0 rounded-lg text-text-tertiary"
+            aria-label={localize('com_image_action_delete')}
+            onClick={onClearReferenceFile}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-border-light px-1 py-2">
+        <div className="flex h-10 items-center gap-2 rounded-xl bg-[#f6f6f7] px-3 text-sm font-medium text-text-primary">
+          <ImageIcon className="h-4 w-4" />
+          <span>{imageModeLabel}</span>
+          <ChevronDown className="h-4 w-4 text-text-tertiary" />
+        </div>
+        <label className="sr-only" htmlFor="hezi-image-model">
+          {localize('com_image_model')}
+        </label>
+        <select
+          id="hezi-image-model"
+          aria-label={localize('com_image_model')}
+          className="h-10 max-w-[220px] rounded-xl border-0 bg-transparent px-2 text-sm text-text-secondary outline-none hover:bg-[#f6f6f7]"
+          value={modelId}
+          onChange={(event) => onModelChange(event.target.value)}
+        >
+          {models.map((item) => (
+            <option key={item.modelId} value={item.modelId} disabled={item.disabled}>
+              {item.modelId}
+            </option>
+          ))}
+        </select>
+        <div className="relative">
+          <Button
+            size="icon"
+            variant="ghost"
+            className={cn('size-10 rounded-xl', configOpen && 'bg-[#f6f6f7]')}
+            aria-label="图像参数"
+            onClick={() => setConfigOpen((open) => !open)}
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+          {configOpen && (
+            <div className="absolute bottom-12 left-0 z-20 grid w-72 gap-3 rounded-2xl border border-border-light bg-white p-4 shadow-xl">
+              <div className="text-sm font-semibold text-text-primary">
+                {model?.displayName || localize('com_image_model')}
+              </div>
+              {paramSchemas.map((schema) => (
+                <ParamControl
+                  key={schema.name}
+                  schema={schema}
+                  value={params[schema.name]}
+                  onChange={(value) => onParamChange(schema.name, value)}
+                />
+              ))}
             </div>
           )}
         </div>
-      ) : null}
-    </aside>
+        {supportsReferenceImage ? (
+          <span className="flex size-10 items-center justify-center rounded-xl text-text-secondary">
+            <ImagePlus className="h-4 w-4" />
+          </span>
+        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-10 rounded-xl text-text-tertiary"
+            aria-label="提示优化"
+          >
+            <Lightbulb className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            className="size-10 rounded-xl"
+            disabled={disabled}
+            aria-label={
+              generating || uploading
+                ? localize('com_image_generating')
+                : localize('com_image_generate')
+            }
+            onClick={onSubmit}
+          >
+            {generating || uploading ? (
+              <Sparkles className="h-4 w-4 animate-pulse" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -525,7 +680,8 @@ export default function ImagePage() {
   const deleteTopicMutation = useDeleteImageTopicMutation();
   const localModels = useMemo(() => getLocalImageModels(), []);
   const models = remoteModels?.length ? remoteModels : localModels;
-  const configuredDefaultModelId = startupConfig?.imageGenDefaultModel || 'gpt-image-2';
+  const imageStartupConfig = startupConfig as ImageStartupConfig | undefined;
+  const configuredDefaultModelId = imageStartupConfig?.imageGenDefaultModel || 'gpt-image-2';
   const [modelId, setModelId] = useState(configuredDefaultModelId);
   const hasAppliedConfiguredDefault = useRef(false);
   const model = useMemo(
@@ -547,14 +703,14 @@ export default function ImagePage() {
   }, [activeTopicId, topics]);
 
   useEffect(() => {
-    if (hasAppliedConfiguredDefault.current || !startupConfig?.imageGenDefaultModel) {
+    if (hasAppliedConfiguredDefault.current || !imageStartupConfig?.imageGenDefaultModel) {
       return;
     }
-    if (models.some((item) => item.modelId === startupConfig.imageGenDefaultModel)) {
-      setModelId(startupConfig.imageGenDefaultModel);
+    if (models.some((item) => item.modelId === imageStartupConfig.imageGenDefaultModel)) {
+      setModelId(imageStartupConfig.imageGenDefaultModel);
       hasAppliedConfiguredDefault.current = true;
     }
-  }, [models, startupConfig?.imageGenDefaultModel]);
+  }, [imageStartupConfig?.imageGenDefaultModel, models]);
 
   useEffect(() => {
     setParams(getDefaultImageParams(model));
@@ -689,6 +845,26 @@ export default function ImagePage() {
     }
   };
 
+  const renderPromptComposer = () => (
+    <PromptComposer
+      model={model}
+      models={models}
+      modelId={model?.modelId ?? modelId}
+      params={params}
+      prompt={prompt}
+      referenceFile={referenceFile}
+      supportsReferenceImage={supportsReferenceImage}
+      generating={generateMutation.isLoading}
+      uploading={uploadImageMutation.isLoading}
+      onModelChange={setModelId}
+      onPromptChange={setPrompt}
+      onReferenceFileChange={setReferenceFile}
+      onClearReferenceFile={() => setReferenceFile(null)}
+      onParamChange={(name, value) => setParams((prev) => ({ ...prev, [name]: value }))}
+      onSubmit={submit}
+    />
+  );
+
   const renderWorkspace = () => {
     if (modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches) {
       return (
@@ -708,37 +884,44 @@ export default function ImagePage() {
 
     if (displayedBatches.length === 0) {
       return (
-        <div className="flex h-full min-h-[420px] items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-lg font-semibold text-text-primary">
-              {localize('com_image_empty')}
-            </h1>
-            <p className="mt-2 text-sm text-text-secondary">{localize('com_image_brand')}</p>
+        <div className="flex min-h-full items-center justify-center px-4 py-10">
+          <div className="grid w-full max-w-[1100px] gap-20">
+            <div className="flex items-center justify-center gap-3 text-center text-4xl font-semibold text-black md:text-5xl">
+              <span>{imageCreateTitle}</span>
+              <button className="inline-flex items-center gap-1 rounded-xl px-1 text-black transition-colors hover:bg-surface-hover">
+                <span>{imageModeLabel}</span>
+                <ChevronDown className="mt-1 h-5 w-5 text-text-secondary" />
+              </button>
+            </div>
+            {renderPromptComposer()}
           </div>
         </div>
       );
     }
 
     return (
-      <div className="mx-auto grid max-w-4xl gap-4">
-        {displayedBatches.map((batch) => (
-          <GenerationCard
-            key={batch._id}
-            batch={batch}
-            deletingBatch={deleteBatchMutation.isLoading}
-            deleting={deleteGenerationMutation.isLoading}
-            generating={generateMutation.isLoading}
-            onDeleteBatch={deleteBatch}
-            onDeleteGeneration={deleteGeneration}
-            onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
-          />
-        ))}
+      <div className="flex min-h-full flex-col gap-6 px-4 py-6">
+        <div className="mx-auto grid w-full max-w-4xl flex-1 gap-4">
+          {displayedBatches.map((batch) => (
+            <GenerationCard
+              key={batch._id}
+              batch={batch}
+              deletingBatch={deleteBatchMutation.isLoading}
+              deleting={deleteGenerationMutation.isLoading}
+              generating={generateMutation.isLoading}
+              onDeleteBatch={deleteBatch}
+              onDeleteGeneration={deleteGeneration}
+              onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
+            />
+          ))}
+        </div>
+        {renderPromptComposer()}
       </div>
     );
   };
 
   return (
-    <div className="flex h-full w-full bg-surface-primary text-text-primary">
+    <div className="flex h-full w-full bg-[#f7f7f8] text-text-primary">
       <TopicSidebar
         topics={topics}
         activeTopicId={activeTopicId}
@@ -749,73 +932,19 @@ export default function ImagePage() {
         renaming={updateTopicMutation.isLoading}
         deleting={deleteTopicMutation.isLoading}
       />
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className="flex min-w-0 flex-1 flex-col bg-[#f1f1f2]">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border-light bg-surface-primary px-3 md:hidden">
           <OpenSidebar />
           <h1 className="min-w-0 truncate text-sm font-semibold text-text-primary">
             {localize('com_nav_image_gen')}
           </h1>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">{renderWorkspace()}</div>
-        <div className="border-t border-border-light bg-surface-primary px-4 py-3 md:px-6">
-          <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-lg border border-border-light bg-surface-primary-alt p-3">
-            <textarea
-              className="min-h-20 resize-none rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-sm outline-none focus:border-border-medium"
-              placeholder={localize('com_image_prompt_placeholder')}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="sr-only" htmlFor="hezi-image-model">
-                {localize('com_image_model')}
-              </label>
-              <select
-                id="hezi-image-model"
-                aria-label={localize('com_image_model')}
-                className="h-9 rounded-lg border border-border-light bg-surface-primary px-2 text-sm"
-                value={model?.modelId}
-                onChange={(event) => setModelId(event.target.value)}
-              >
-                {models.map((item) => (
-                  <option key={item.modelId} value={item.modelId} disabled={item.disabled}>
-                    {item.modelId}
-                  </option>
-                ))}
-              </select>
-              <div className="flex flex-wrap gap-2 xl:hidden">
-                {(model?.paramSchemas ?? []).map((schema) => (
-                  <ParamControl
-                    key={schema.name}
-                    schema={schema}
-                    value={params[schema.name]}
-                    onChange={(value) => setParams((prev) => ({ ...prev, [schema.name]: value }))}
-                  />
-                ))}
-              </div>
-              <Button
-                className="ml-auto"
-                disabled={
-                  !prompt.trim() || generateMutation.isLoading || uploadImageMutation.isLoading
-                }
-                onClick={submit}
-              >
-                {generateMutation.isLoading || uploadImageMutation.isLoading
-                  ? localize('com_image_generating')
-                  : localize('com_image_generate')}
-              </Button>
-            </div>
+        <div className="min-h-0 flex-1 p-2 md:p-4">
+          <div className="h-full overflow-hidden rounded-[22px] border border-border-light bg-white shadow-sm">
+            <div className="h-full overflow-y-auto">{renderWorkspace()}</div>
           </div>
         </div>
       </main>
-      <ModelInspector
-        model={model}
-        params={params}
-        referenceFile={referenceFile}
-        supportsReferenceImage={supportsReferenceImage}
-        onReferenceFileChange={setReferenceFile}
-        onClearReferenceFile={() => setReferenceFile(null)}
-        onParamChange={(name, value) => setParams((prev) => ({ ...prev, [name]: value }))}
-      />
     </div>
   );
 }

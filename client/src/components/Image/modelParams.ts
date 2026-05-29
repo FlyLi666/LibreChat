@@ -17,7 +17,7 @@ const imageModels: TImageModel[] = [
       {
         name: 'size',
         type: 'enum',
-        default: '1024x1024',
+        default: 'auto',
         enum: [
           'auto',
           '1024x1024',

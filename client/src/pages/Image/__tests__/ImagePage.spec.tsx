@@ -178,8 +178,10 @@ describe('ImagePage', () => {
   it('renders the empty state and default gpt-image-2 controls', () => {
     renderPage();
 
-    expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+    expect(screen.getByText('即刻创作')).toBeInTheDocument();
+    expect(screen.getAllByText('图片').length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue('gpt-image-2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '图像参数' }));
     expect(screen.getAllByText('尺寸').length).toBeGreaterThan(0);
     expect(screen.getAllByText('质量').length).toBeGreaterThan(0);
     expect(screen.getAllByText('数量').length).toBeGreaterThan(0);
@@ -248,7 +250,7 @@ describe('ImagePage', () => {
 
     renderPage();
 
-    expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+    expect(screen.getByText('即刻创作')).toBeInTheDocument();
     expect(screen.queryByText('生成中...')).not.toBeInTheDocument();
   });
 
@@ -258,6 +260,7 @@ describe('ImagePage', () => {
     fireEvent.change(screen.getByLabelText('Model'), {
       target: { value: 'gemini-3.1-flash-image-preview' },
     });
+    fireEvent.click(screen.getByRole('button', { name: '图像参数' }));
 
     expect(screen.getAllByText('比例').length).toBeGreaterThan(0);
     expect(screen.getAllByText('分辨率').length).toBeGreaterThan(0);
@@ -279,7 +282,7 @@ describe('ImagePage', () => {
   it('submits prompt, model, params, and image count', async () => {
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('描述你想画的内容...'), {
+    fireEvent.change(screen.getByPlaceholderText('描述你想要生成的内容'), {
       target: { value: '画一只穿宇航服的猫' },
     });
     fireEvent.click(screen.getByRole('button', { name: '生成' }));
@@ -306,7 +309,7 @@ describe('ImagePage', () => {
     fireEvent.change(screen.getByLabelText('参考图'), {
       target: { files: [reference] },
     });
-    fireEvent.change(screen.getByPlaceholderText('描述你想画的内容...'), {
+    fireEvent.change(screen.getByPlaceholderText('描述你想要生成的内容'), {
       target: { value: '保留参考图构图，改成玻璃质感 App 图标' },
     });
     fireEvent.click(screen.getByRole('button', { name: '生成' }));
@@ -346,19 +349,19 @@ describe('ImagePage', () => {
     });
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('描述你想画的内容...'), {
+    fireEvent.change(screen.getByPlaceholderText('描述你想要生成的内容'), {
       target: { value: '画一只穿宇航服的猫' },
     });
     fireEvent.click(screen.getByRole('button', { name: '生成' }));
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('描述你想画的内容...')).toHaveValue('画一只穿宇航服的猫');
+      expect(screen.getByPlaceholderText('描述你想要生成的内容')).toHaveValue('画一只穿宇航服的猫');
       expect(screen.getByText('当前模型暂不可用，请换一个')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('新建主题'));
 
-    expect(screen.getByPlaceholderText('描述你想画的内容...')).toHaveValue('');
+    expect(screen.getByPlaceholderText('描述你想要生成的内容')).toHaveValue('');
     expect(screen.queryByText('当前模型暂不可用，请换一个')).not.toBeInTheDocument();
   });
 
@@ -389,7 +392,7 @@ describe('ImagePage', () => {
       expect(mockDeleteImageGeneration).toHaveBeenCalledWith('generation-1');
       expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
     });
-    expect(screen.getByText('还没有作品，画点什么吧')).toBeInTheDocument();
+    expect(screen.getByText('即刻创作')).toBeInTheDocument();
   });
 
   it('deletes a full image batch from the feed', async () => {
