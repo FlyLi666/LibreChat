@@ -36,6 +36,7 @@ router.get('/', async (req, res) => {
   const search = req.query.search ? decodeURIComponent(req.query.search) : undefined;
   const sortBy = req.query.sortBy || 'updatedAt';
   const sortDirection = req.query.sortDirection || 'desc';
+  const agent_id = typeof req.query.agent_id === 'string' ? req.query.agent_id : undefined;
 
   let tags;
   if (req.query.tags) {
@@ -51,6 +52,7 @@ router.get('/', async (req, res) => {
       search,
       sortBy,
       sortDirection,
+      agent_id,
     });
     res.status(200).json(result);
   } catch (error) {

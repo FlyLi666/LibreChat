@@ -2,11 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronLeft,
+  Copy,
   Download,
   Home,
   ImageIcon,
   ImagePlus,
+  LayoutGrid,
   Lightbulb,
+  ListIcon,
   Maximize2,
   Pencil,
   Plus,
@@ -18,6 +21,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { v4 } from 'uuid';
 import type {
   TImageBatch,
@@ -47,6 +51,7 @@ import {
 } from '~/components/Image/modelParams';
 
 type Params = Record<string, unknown>;
+type TopicViewMode = 'grid' | 'list';
 type ImageStartupConfig = {
   imageGenDefaultModel?: string;
 };
@@ -63,9 +68,6 @@ const schemaLabelFallbacks: Record<string, string> = {
   strength: 'com_image_config_strength',
 };
 
-const imageCreateTitle = '即刻创作';
-const imageModeLabel = '图片';
-
 function startOfLocalDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
@@ -76,15 +78,23 @@ function getTopicTime(topic: TImageTopic) {
   return Number.isFinite(time) ? time : 0;
 }
 
-export function groupTopics(topics: TImageTopic[]) {
+export function groupTopics(
+  topics: TImageTopic[],
+  labels = {
+    today: 'Today',
+    yesterday: 'Yesterday',
+    previous7Days: 'Previous 7 days',
+    older: 'Older',
+  },
+) {
   const todayStart = startOfLocalDay(new Date());
   const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
   const sevenDaysStart = todayStart - 6 * 24 * 60 * 60 * 1000;
   const groups = [
-    { label: '今天', topics: [] as TImageTopic[] },
-    { label: '昨天', topics: [] as TImageTopic[] },
-    { label: '过去 7 天', topics: [] as TImageTopic[] },
-    { label: '更早', topics: [] as TImageTopic[] },
+    { label: labels.today, topics: [] as TImageTopic[] },
+    { label: labels.yesterday, topics: [] as TImageTopic[] },
+    { label: labels.previous7Days, topics: [] as TImageTopic[] },
+    { label: labels.older, topics: [] as TImageTopic[] },
   ];
 
   for (const topic of topics) {
@@ -146,11 +156,30 @@ function getImageDownloadFilename(url: string) {
   }
 }
 
+function formatImageBatchTime(batch: TImageBatch) {
+  const raw = (batch as TImageBatch & { createdAt?: string; updatedAt?: string }).createdAt;
+  const fallback = (batch as TImageBatch & { createdAt?: string; updatedAt?: string }).updatedAt;
+  const date = raw || fallback ? new Date(raw || fallback || '') : null;
+
+  if (!date || !Number.isFinite(date.getTime())) {
+    return '';
+  }
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function supportsReferenceImages(model: TImageModel | undefined) {
   return (model?.paramSchemas ?? []).some(
     (schema) =>
       schema.name === 'imageUrls' && (schema.type === 'image' || schema.type === 'images'),
   );
+}
+
+function getTopicCoverUrl(topic: TImageTopic) {
+  return (topic as TImageTopic & { coverUrl?: string | null }).coverUrl || '';
 }
 
 function ParamControl({
@@ -211,10 +240,13 @@ function TopicSidebar({
   onSelect,
   onNewTopic,
   onMobileClose,
+  onCollapse,
   onRenameTopic,
   onDeleteTopic,
   renaming,
   deleting,
+  viewMode,
+  onViewModeChange,
 }: {
   topics: TImageTopic[];
   activeTopicId: string | null;
@@ -222,13 +254,18 @@ function TopicSidebar({
   onSelect: (topicId: string) => void;
   onNewTopic: () => void;
   onMobileClose?: () => void;
+  onCollapse?: () => void;
   onRenameTopic: (topicId: string, title: string) => Promise<void>;
   onDeleteTopic: (topicId: string) => Promise<void>;
   renaming: boolean;
   deleting: boolean;
+  viewMode: TopicViewMode;
+  onViewModeChange: (mode: TopicViewMode) => void;
 }) {
   const localize = useLocalize();
   const [query, setQuery] = useState('');
+  const [topicsExpanded, setTopicsExpanded] = useState(true);
+  const untitledLabel = localize('com_ui_untitled');
   const filteredTopics = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     if (!keyword) {
@@ -259,7 +296,7 @@ function TopicSidebar({
     cancelRename();
   };
 
-  const topicLabel = `图片主题 ${filteredTopics.length}`;
+  const topicLabel = localize('com_image_topic_count', { count: filteredTopics.length });
 
   const selectTopic = (topicId: string) => {
     onSelect(topicId);
@@ -272,125 +309,277 @@ function TopicSidebar({
   };
 
   const renderHeader = (mobile = false) => (
-    <div className="flex h-16 items-center justify-between border-b border-border-light px-5">
+    <div className="flex h-14 items-center justify-between border-b border-border-light px-4">
       <div className="flex items-center gap-2 text-sm font-medium text-text-secondary">
         <Home className="h-4 w-4" />
         <ChevronDown className="h-3.5 w-3.5 -rotate-90 text-text-tertiary" />
-        <span className="text-text-primary">{imageModeLabel}</span>
+        <span className="text-text-primary">{localize('com_image_mode_image')}</span>
       </div>
       <Button
         size="icon"
         variant="ghost"
         className="size-8 rounded-lg text-text-tertiary"
-        aria-label={mobile ? '关闭图片主题' : '收起图片侧栏'}
-        onClick={mobile ? onMobileClose : undefined}
+        aria-label={
+          mobile ? localize('com_image_close_topics') : localize('com_image_collapse_sidebar')
+        }
+        onClick={mobile ? onMobileClose : onCollapse}
       >
         {mobile ? <X className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </Button>
     </div>
   );
 
-  const renderTopics = () => (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+  const renderTopicThumb = (topic: TImageTopic, className = '') => {
+    const coverUrl = getTopicCoverUrl(topic);
+    if (coverUrl) {
+      return (
+        <img
+          src={coverUrl}
+          alt={topic.title || untitledLabel}
+          className={cn('h-full w-full rounded-[inherit] object-cover', className)}
+        />
+      );
+    }
+
+    return (
+      <span className={cn('line-clamp-2 px-1 text-center font-semibold', className)}>
+        {topic.title || untitledLabel}
+      </span>
+    );
+  };
+
+  const renderTopicActions = (topic: TImageTopic, compact = false) => (
+    <div
+      className={cn(
+        'flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100',
+        compact ? 'ml-auto shrink-0' : 'absolute right-1 top-1',
+      )}
+    >
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7 rounded-lg bg-white/90 shadow-sm"
+        aria-label={localize('com_ui_rename')}
+        disabled={renaming || editingTopicId === topic._id}
+        onClick={(event) => {
+          event.stopPropagation();
+          beginRename(topic);
+        }}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7 rounded-lg bg-white/90 shadow-sm"
+        aria-label={localize('com_image_action_delete')}
+        disabled={deleting}
+        onClick={(event) => {
+          event.stopPropagation();
+          void onDeleteTopic(topic._id);
+        }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+
+  const renderTopicTile = (topic: TImageTopic) => {
+    const isEditing = editingTopicId === topic._id;
+    const isActive = topic._id === activeTopicId;
+
+    if (viewMode === 'list') {
+      return (
+        <div key={topic._id} className="group">
+          {isEditing ? (
+            <input
+              className="h-10 w-full rounded-lg border border-border-medium bg-white px-3 text-sm font-medium text-text-primary outline-none"
+              value={editingTitle}
+              onBlur={() => void saveRename(topic)}
+              onChange={(event) => setEditingTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  void saveRename(topic);
+                }
+                if (event.key === 'Escape') {
+                  cancelRename();
+                }
+              }}
+            />
+          ) : (
+            <div
+              className={cn(
+                'flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-white text-text-primary shadow-sm ring-1 ring-border-medium'
+                  : 'text-text-secondary hover:bg-white hover:text-text-primary',
+              )}
+            >
+              <button
+                className="flex h-11 min-w-0 flex-1 items-center gap-2 text-left"
+                aria-label={topic.title || untitledLabel}
+                onClick={() => selectTopic(topic._id)}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#e9e9ea] text-xs text-text-primary"
+                >
+                  {renderTopicThumb(topic)}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{topic.title || untitledLabel}</span>
+              </button>
+              {renderTopicActions(topic, true)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div key={topic._id} className="group relative">
+        {isEditing ? (
+          <input
+            className="aspect-square w-full rounded-lg border border-border-medium bg-white px-2 text-center text-sm font-medium text-text-primary outline-none"
+            value={editingTitle}
+            onBlur={() => void saveRename(topic)}
+            onChange={(event) => setEditingTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                void saveRename(topic);
+              }
+              if (event.key === 'Escape') {
+                cancelRename();
+              }
+            }}
+          />
+        ) : (
+          <button
+            className={cn(
+              'flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border text-center text-2xl font-semibold transition-all',
+              isActive
+                ? 'border-white bg-white text-text-primary shadow-sm ring-2 ring-black'
+                : 'border-transparent bg-[#e9e9ea] text-black hover:bg-white hover:shadow-sm',
+            )}
+            aria-label={topic.title || untitledLabel}
+            onClick={() => selectTopic(topic._id)}
+          >
+            {renderTopicThumb(topic)}
+          </button>
+        )}
+        {renderTopicActions(topic)}
+      </div>
+    );
+  };
+
+  const renderTopicList = () => {
+    if (!topicsExpanded) {
+      return null;
+    }
+
+    if (filteredTopics.length > 0) {
+      return (
+        <div className={cn(viewMode === 'grid' ? 'grid grid-cols-3 gap-2' : 'grid gap-1')}>
+          {filteredTopics.map(renderTopicTile)}
+        </div>
+      );
+    }
+
+    return (
       <button
-        className="flex h-11 items-center gap-3 rounded-xl px-1 text-left text-[15px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+        className="flex h-16 w-full items-center justify-center rounded-xl border border-dashed border-border-light bg-white/60 text-sm font-medium text-text-tertiary"
         onClick={createTopic}
       >
-        <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-white">
+        {localize('com_image_create_topic')}
+      </button>
+    );
+  };
+
+  const renderTopics = () => (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+      <button
+        className="flex h-10 items-center gap-3 rounded-lg px-2 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-white hover:text-text-primary"
+        onClick={createTopic}
+      >
+        <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-white text-text-primary">
           <Plus className="h-4 w-4" />
         </span>
         <span>{localize('com_image_new_topic')}</span>
       </button>
-      <label className="flex h-11 items-center gap-3 rounded-xl px-1 text-[15px] text-text-tertiary">
+      <label className="flex h-11 items-center gap-3 rounded-xl bg-[#f0f0f1] px-3 text-[15px] text-text-tertiary">
         <Search className="h-5 w-5" />
         <input
           className="min-w-0 flex-1 bg-transparent text-text-primary outline-none placeholder:text-text-tertiary"
-          placeholder="搜索"
+          placeholder={localize('com_ui_search')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
       <section className="min-h-0">
-        <div className="mb-6 flex items-center gap-2 text-sm font-medium text-text-tertiary">
-          <span>{topicLabel}</span>
-          <ChevronDown className="h-4 w-4" />
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {filteredTopics.map((topic) => (
-            <div key={topic._id} className="group relative">
-              {editingTopicId === topic._id ? (
-                <input
-                  className="aspect-square w-full rounded-xl border border-border-medium bg-white px-2 text-center text-sm font-medium text-text-primary outline-none"
-                  value={editingTitle}
-                  onBlur={() => void saveRename(topic)}
-                  onChange={(event) => setEditingTitle(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      void saveRename(topic);
-                    }
-                    if (event.key === 'Escape') {
-                      cancelRename();
-                    }
-                  }}
-                />
-              ) : (
-                <button
-                  className={cn(
-                    'flex aspect-square w-full items-center justify-center rounded-xl border text-center text-3xl font-semibold transition-all',
-                    topic._id === activeTopicId
-                      ? 'border-border-medium bg-white text-text-primary shadow-sm ring-2 ring-black/5'
-                      : 'border-transparent bg-[#e9e9ea] text-black hover:bg-white hover:shadow-sm',
-                  )}
-                  title={topic.title}
-                  onClick={() => selectTopic(topic._id)}
-                >
-                  <span className="line-clamp-2 px-2">{topic.title || '未命名'}</span>
-                </button>
+        <div className="mb-3 flex items-center gap-2">
+          <button
+            className="flex min-w-0 flex-1 items-center gap-1 text-left text-sm font-medium text-text-tertiary"
+            aria-expanded={topicsExpanded}
+            onClick={() => setTopicsExpanded((open) => !open)}
+          >
+            <span className="truncate">{topicLabel}</span>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 shrink-0 transition-transform',
+                !topicsExpanded && '-rotate-90',
               )}
-              <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 rounded-lg bg-white/90 shadow-sm"
-                  aria-label={localize('com_ui_rename')}
-                  disabled={renaming || editingTopicId === topic._id}
-                  onClick={() => beginRename(topic)}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 rounded-lg bg-white/90 shadow-sm"
-                  aria-label={localize('com_image_action_delete')}
-                  disabled={deleting}
-                  onClick={() => void onDeleteTopic(topic._id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            />
+          </button>
+          <div
+            className="flex rounded-lg bg-[#f0f0f1] p-0.5"
+            role="group"
+            aria-label={localize('com_image_topic_view')}
+          >
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn('size-8 rounded-md', viewMode === 'list' && 'bg-white shadow-sm')}
+              aria-label={localize('com_image_topic_view_list')}
+              aria-pressed={viewMode === 'list'}
+              onClick={() => onViewModeChange('list')}
+            >
+              <ListIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn('size-8 rounded-md', viewMode === 'grid' && 'bg-white shadow-sm')}
+              aria-label={localize('com_image_topic_view_grid')}
+              aria-pressed={viewMode === 'grid'}
+              onClick={() => onViewModeChange('grid')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        {renderTopicList()}
       </section>
     </div>
   );
 
   return (
     <>
-      <aside className="hidden w-[448px] shrink-0 border-r border-border-light bg-[#f7f7f8] text-text-primary lg:flex lg:flex-col">
+      <aside className="hidden w-[288px] shrink-0 border-r border-border-light bg-[#f7f7f8] text-text-primary lg:flex lg:flex-col">
         {renderHeader()}
         {renderTopics()}
       </aside>
       {mobileOpen && (
         <>
           <div className="fixed inset-0 z-[105] bg-black/40 lg:hidden" role="presentation">
-            <button className="h-full w-full" aria-label="关闭图片主题" onClick={onMobileClose} />
+            <button
+              className="h-full w-full"
+              aria-label={localize('com_image_close_topics')}
+              onClick={onMobileClose}
+            />
           </div>
           <aside
             data-testid="image-topic-drawer"
             className="fixed left-0 top-0 z-[106] flex h-dvh w-[min(88vw,390px)] flex-col border-r border-border-light bg-[#f7f7f8] text-text-primary shadow-2xl lg:hidden"
-            aria-label="图片主题"
+            aria-label={localize('com_image_topics')}
           >
             {renderHeader(true)}
             {renderTopics()}
@@ -406,6 +595,7 @@ function GenerationCard({
   onDeleteBatch,
   onDeleteGeneration,
   onRecreateBatch,
+  onReuseBatchSettings,
   deletingBatch,
   deleting,
   generating,
@@ -414,31 +604,37 @@ function GenerationCard({
   onDeleteBatch: (batchId: string) => void;
   onDeleteGeneration: (generationId: string) => void;
   onRecreateBatch: (batch: TImageBatch) => void;
+  onReuseBatchSettings: (batch: TImageBatch) => void;
   deletingBatch: boolean;
   deleting: boolean;
   generating: boolean;
 }) {
   const localize = useLocalize();
   const [preview, setPreview] = useState<{ url: string; prompt: string } | null>(null);
+  const [batchHovered, setBatchHovered] = useState(false);
+  const [hoveredGenerationId, setHoveredGenerationId] = useState<string | null>(null);
+  const batchTime = formatImageBatchTime(batch);
+  const imageCount = batch.generations.length;
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard?.writeText(batch.prompt);
+    } catch {
+      // Clipboard can be blocked in test or insecure contexts; the action is best-effort.
+    }
+  };
 
   return (
-    <article className="rounded-lg border border-border-light bg-surface-primary p-3">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-text-primary">{batch.prompt}</p>
-          <p className="mt-1 text-xs text-text-tertiary">{batch.model}</p>
-        </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-8 shrink-0 gap-1 px-2 text-xs text-text-secondary"
-          aria-label={localize('com_image_action_delete_batch')}
-          disabled={deletingBatch}
-          onClick={() => onDeleteBatch(batch._id)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {localize('com_image_action_delete_batch')}
-        </Button>
+    <article
+      className="group rounded-xl bg-surface-primary px-0 py-3"
+      onMouseEnter={() => setBatchHovered(true)}
+      onMouseLeave={() => {
+        setBatchHovered(false);
+        setHoveredGenerationId(null);
+      }}
+    >
+      <div className="mb-4">
+        <p className="text-base font-medium leading-6 text-text-primary">{batch.prompt}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {batch.generations.map((generation) => {
@@ -448,9 +644,16 @@ function GenerationCard({
           return (
             <div
               key={generation._id}
-              className="group relative aspect-square overflow-hidden rounded-lg bg-surface-secondary"
+              className="relative aspect-square overflow-hidden rounded-xl bg-[#f6f6f6]"
+              onMouseEnter={() => setHoveredGenerationId(generation._id)}
+              onMouseLeave={() => setHoveredGenerationId(null)}
             >
-              <div className="bg-surface-primary/90 absolute right-1 top-1 z-10 flex gap-0.5 rounded-lg p-1 opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+              <div
+                className={cn(
+                  'absolute right-2 top-2 z-10 flex gap-1 rounded-lg bg-white/90 p-1 opacity-100 shadow-sm backdrop-blur transition-opacity md:opacity-0',
+                  hoveredGenerationId === generation._id && 'md:opacity-100',
+                )}
+              >
                 <Button
                   size="icon"
                   variant="ghost"
@@ -496,12 +699,18 @@ function GenerationCard({
               </div>
               {generation.status === 'pending' && (
                 <div className="flex h-full items-center justify-center text-sm text-text-secondary">
-                  生成中...
+                  {localize('com_image_generating')}
                 </div>
               )}
               {generation.status === 'failed' && (
-                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-red-600">
-                  {generation.error || localize('com_image_error_no_channel')}
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center text-sm text-text-tertiary">
+                  <ImageIcon className="h-8 w-8 text-text-tertiary" />
+                  <div className="text-base font-semibold text-text-secondary">
+                    {localize('com_image_generation_failed_hint')}
+                  </div>
+                  <div className="font-mono text-sm text-text-tertiary">
+                    {generation.error || localize('com_image_error_no_channel')}
+                  </div>
                 </div>
               )}
               {imageUrl && (
@@ -510,6 +719,52 @@ function GenerationCard({
             </div>
           );
         })}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-text-tertiary">
+        <span className="flex items-center gap-1.5">
+          <Sparkles className="h-4 w-4" />
+          {batch.model}
+        </span>
+        <span>{localize('com_image_count', { count: imageCount })}</span>
+      </div>
+      <div
+        className={cn(
+          'mt-4 flex items-center justify-between gap-3 opacity-100 transition-opacity md:opacity-0',
+          'md:group-hover:opacity-100',
+          batchHovered && 'md:opacity-100',
+        )}
+      >
+        <div className="flex rounded-xl bg-[#f7f7f7] p-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-9 rounded-lg text-text-secondary"
+            aria-label={localize('com_image_action_reuse_settings')}
+            onClick={() => onReuseBatchSettings(batch)}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-9 rounded-lg text-text-secondary"
+            aria-label={localize('com_image_action_copy_prompt')}
+            onClick={() => void copyPrompt()}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-9 rounded-lg text-text-secondary hover:bg-red-50 hover:text-red-600"
+            aria-label={localize('com_image_action_delete_batch')}
+            disabled={deletingBatch}
+            onClick={() => onDeleteBatch(batch._id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        {batchTime ? <time className="text-sm text-text-tertiary">{batchTime}</time> : null}
       </div>
       <OGDialog open={!!preview} onOpenChange={(open) => !open && setPreview(null)}>
         <OGDialogContent className="h-[90vh] max-h-[90vh] w-[94vw] max-w-5xl overflow-hidden border-border-light bg-surface-primary p-0">
@@ -592,7 +847,7 @@ function PromptComposer({
         ) : null}
         <textarea
           className="min-h-[96px] min-w-0 flex-1 resize-none bg-transparent px-1 py-3 text-[15px] text-text-primary outline-none placeholder:text-text-tertiary"
-          placeholder="描述你想要生成的内容"
+          placeholder={localize('com_image_prompt_placeholder')}
           value={prompt}
           onChange={(event) => onPromptChange(event.target.value)}
         />
@@ -611,7 +866,7 @@ function PromptComposer({
       <div className="flex flex-wrap items-center gap-2 border-t border-border-light px-1 py-2">
         <div className="flex h-10 items-center gap-2 rounded-xl bg-[#f6f6f7] px-3 text-sm font-medium text-text-primary">
           <ImageIcon className="h-4 w-4" />
-          <span>{imageModeLabel}</span>
+          <span>{localize('com_image_mode_image')}</span>
           <ChevronDown className="h-4 w-4 text-text-tertiary" />
         </div>
         <label className="sr-only" htmlFor="hezi-image-model">
@@ -635,7 +890,7 @@ function PromptComposer({
             size="icon"
             variant="ghost"
             className={cn('size-10 rounded-xl', configOpen && 'bg-[#f6f6f7]')}
-            aria-label="图像参数"
+            aria-label={localize('com_image_parameters')}
             onClick={() => setConfigOpen((open) => !open)}
           >
             <Settings2 className="h-4 w-4" />
@@ -666,7 +921,7 @@ function PromptComposer({
             size="icon"
             variant="ghost"
             className="size-10 rounded-xl text-text-tertiary"
-            aria-label="提示优化"
+            aria-label={localize('com_image_action_optimize_prompt')}
           >
             <Lightbulb className="h-4 w-4" />
           </Button>
@@ -695,6 +950,8 @@ function PromptComposer({
 
 export default function ImagePage() {
   const localize = useLocalize();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const topicParam = searchParams.get('topic');
   const { data: startupConfig } = useGetStartupConfig();
   const {
     data: remoteModels,
@@ -734,14 +991,57 @@ export default function ImagePage() {
   const [inlineBatches, setInlineBatches] = useState<TImageBatch[]>([]);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [topicsPanelOpen, setTopicsPanelOpen] = useState(false);
+  const [desktopTopicsOpen, setDesktopTopicsOpen] = useState(true);
+  const [topicViewMode, setTopicViewMode] = useState<TopicViewMode>(() => {
+    if (typeof window === 'undefined') {
+      return 'grid';
+    }
+    return window.localStorage.getItem('hezi:imageTopicViewMode') === 'list' ? 'list' : 'grid';
+  });
   const [deletedGenerationIds, setDeletedGenerationIds] = useState<Set<string>>(() => new Set());
   const [deletedBatchIds, setDeletedBatchIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
-    if (!activeTopicId && topics[0]?._id) {
-      setActiveTopicId(topics[0]._id);
+    if (topicsLoading) {
+      return;
     }
-  }, [activeTopicId, topics]);
+
+    if (!topicParam) {
+      if (activeTopicId) {
+        setActiveTopicId(null);
+        setInlineBatches([]);
+        setDeletedBatchIds(new Set());
+        setDeletedGenerationIds(new Set());
+      }
+      return;
+    }
+
+    const topicExists = topics.some((topic) => topic._id === topicParam);
+    if (topicExists) {
+      if (activeTopicId !== topicParam) {
+        setActiveTopicId(topicParam);
+        setInlineBatches([]);
+        setDeletedBatchIds(new Set());
+        setDeletedGenerationIds(new Set());
+      }
+      return;
+    }
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('topic');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [activeTopicId, setSearchParams, topicParam, topics, topicsLoading]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('hezi:imageTopicViewMode', topicViewMode);
+    }
+  }, [topicViewMode]);
 
   useEffect(() => {
     if (hasAppliedConfiguredDefault.current || !imageStartupConfig?.imageGenDefaultModel) {
@@ -785,16 +1085,35 @@ export default function ImagePage() {
     setDeletedBatchIds(new Set());
     setDeletedGenerationIds(new Set());
     setPrompt('');
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('topic');
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  const selectTopic = (topicId: string) => {
+    setActiveTopicId(topicId);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('topic', topicId);
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   const hasActiveTopic = !!activeTopicId;
-  const selectingInitialTopic = !activeTopicId && topics.length > 0;
   const isLoadingBatches = hasActiveTopic && batchesLoading;
   const hasBatchesError = hasActiveTopic && batchesError;
-  const isWorkspaceBusy =
-    modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches;
+  const isWorkspaceBusy = modelsLoading || topicsLoading || isLoadingBatches;
   const hasWorkspaceError = modelsError || topicsError || hasBatchesError;
-  const shouldDockComposer = !isWorkspaceBusy && !hasWorkspaceError && displayedBatches.length > 0;
+  const shouldDockComposer =
+    !isWorkspaceBusy && !hasWorkspaceError && (hasActiveTopic || displayedBatches.length > 0);
 
   const submit = async () => {
     const trimmed = prompt.trim();
@@ -826,7 +1145,7 @@ export default function ImagePage() {
         imageNum,
       });
       if (response.topic?._id) {
-        setActiveTopicId(response.topic._id);
+        selectTopic(response.topic._id);
       }
       upsertInlineBatch(response.batch);
       setPrompt('');
@@ -834,7 +1153,7 @@ export default function ImagePage() {
       const data = (error as { response?: { data?: { topic?: TImageTopic; batch?: TImageBatch } } })
         ?.response?.data;
       if (data?.topic?._id) {
-        setActiveTopicId(data.topic._id);
+        selectTopic(data.topic._id);
       }
       upsertInlineBatch(data?.batch);
     }
@@ -870,9 +1189,15 @@ export default function ImagePage() {
       ),
     });
     if (response.topic?._id) {
-      setActiveTopicId(response.topic._id);
+      selectTopic(response.topic._id);
     }
     upsertInlineBatch(response.batch);
+  };
+
+  const reuseBatchSettings = (batch: TImageBatch) => {
+    setModelId(batch.model);
+    setParams({ ...(batch.params as Params | undefined) });
+    setPrompt(batch.prompt);
   };
 
   const renameTopic = async (topicId: string, title: string) => {
@@ -886,7 +1211,11 @@ export default function ImagePage() {
     setDeletedGenerationIds(new Set());
     if (activeTopicId === topicId) {
       const nextTopic = topics.find((topic) => topic._id !== topicId);
-      setActiveTopicId(nextTopic?._id ?? null);
+      if (nextTopic?._id) {
+        selectTopic(nextTopic._id);
+      } else {
+        startNewTopic();
+      }
     }
   };
 
@@ -928,13 +1257,23 @@ export default function ImagePage() {
     }
 
     if (displayedBatches.length === 0) {
+      if (hasActiveTopic) {
+        return (
+          <div className="flex min-h-full items-center justify-center px-4 py-10">
+            <div className="text-center text-sm font-medium text-text-tertiary">
+              {localize('com_image_empty_topic')}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex min-h-full items-center justify-center px-4 py-10">
           <div className="grid w-full max-w-[1100px] gap-20">
             <div className="flex items-center justify-center gap-3 text-center text-4xl font-semibold text-black md:text-5xl">
-              <span>{imageCreateTitle}</span>
+              <span>{localize('com_image_create_title')}</span>
               <button className="inline-flex items-center gap-1 rounded-xl px-1 text-black transition-colors hover:bg-surface-hover">
-                <span>{imageModeLabel}</span>
+                <span>{localize('com_image_mode_image')}</span>
                 <ChevronDown className="mt-1 h-5 w-5 text-text-secondary" />
               </button>
             </div>
@@ -956,6 +1295,7 @@ export default function ImagePage() {
             onDeleteBatch={deleteBatch}
             onDeleteGeneration={deleteGeneration}
             onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
+            onReuseBatchSettings={reuseBatchSettings}
           />
         ))}
       </div>
@@ -963,19 +1303,35 @@ export default function ImagePage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full overflow-hidden bg-[#f7f7f8] text-text-primary">
-      <TopicSidebar
-        topics={topics}
-        activeTopicId={activeTopicId}
-        mobileOpen={topicsPanelOpen}
-        onSelect={setActiveTopicId}
-        onNewTopic={startNewTopic}
-        onMobileClose={() => setTopicsPanelOpen(false)}
-        onRenameTopic={renameTopic}
-        onDeleteTopic={deleteTopic}
-        renaming={updateTopicMutation.isLoading}
-        deleting={deleteTopicMutation.isLoading}
-      />
+    <div className="relative flex h-full min-h-0 w-full overflow-hidden bg-[#f7f7f8] text-text-primary">
+      {desktopTopicsOpen ? (
+        <TopicSidebar
+          topics={topics}
+          activeTopicId={activeTopicId}
+          mobileOpen={topicsPanelOpen}
+          onSelect={selectTopic}
+          onNewTopic={startNewTopic}
+          onMobileClose={() => setTopicsPanelOpen(false)}
+          onCollapse={() => setDesktopTopicsOpen(false)}
+          onRenameTopic={renameTopic}
+          onDeleteTopic={deleteTopic}
+          renaming={updateTopicMutation.isLoading}
+          deleting={deleteTopicMutation.isLoading}
+          viewMode={topicViewMode}
+          onViewModeChange={setTopicViewMode}
+        />
+      ) : null}
+      {!desktopTopicsOpen ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="absolute left-3 top-3 z-20 hidden size-9 rounded-xl bg-white/90 text-text-secondary shadow-sm lg:inline-flex"
+          aria-label={localize('com_image_open_sidebar')}
+          onClick={() => setDesktopTopicsOpen(true)}
+        >
+          <ImageIcon className="h-4 w-4" />
+        </Button>
+      ) : null}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f1f1f2]">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border-light bg-surface-primary px-3 md:hidden">
           <OpenSidebar />
@@ -986,7 +1342,7 @@ export default function ImagePage() {
             size="icon"
             variant="ghost"
             className="ml-auto size-9 rounded-xl text-text-secondary"
-            aria-label="打开图片主题"
+            aria-label={localize('com_image_open_topics')}
             onClick={() => setTopicsPanelOpen(true)}
           >
             <ImageIcon className="h-4 w-4" />

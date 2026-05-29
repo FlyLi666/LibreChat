@@ -19,6 +19,7 @@ import LoginLayout from './Layouts/Login';
 import dashboardRoutes from './Dashboard';
 import ShareRoute from './ShareRoute';
 import ChatRoute from './ChatRoute';
+import AgentRoute from './AgentRoute';
 import Search from './Search';
 import Root from './Root';
 
@@ -46,6 +47,11 @@ const loadNotebookPage = () =>
 
 const loadImagePage = () =>
   import('~/pages/Image').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadCommunityMarketPage = () =>
+  import('~/pages/CommunityMarket').then((m) => ({
     Component: m.default,
   }));
 
@@ -129,6 +135,38 @@ export const router = createBrowserRouter(
               element: <ChatRoute />,
             },
             {
+              path: 'agent/:agentId',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/profile',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/topics',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/channel',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/task',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/task/:taskId',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/:conversationId/page',
+              element: <AgentRoute />,
+            },
+            {
+              path: 'agent/:agentId/:conversationId?',
+              element: <AgentRoute />,
+            },
+            {
               path: 'search',
               element: <Search />,
             },
@@ -149,6 +187,18 @@ export const router = createBrowserRouter(
                   lazy: loadNotebookPage,
                 },
               ],
+            },
+            {
+              path: 'community',
+              lazy: loadCommunityMarketPage,
+            },
+            {
+              path: 'community/:tab',
+              lazy: loadCommunityMarketPage,
+            },
+            {
+              path: 'community/:tab/:identifier',
+              lazy: loadCommunityMarketPage,
             },
             {
               path: 'prompts',

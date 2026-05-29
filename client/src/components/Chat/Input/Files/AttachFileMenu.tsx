@@ -6,15 +6,10 @@ import {
   ImageUpIcon,
   FileType2Icon,
   FileImageIcon,
+  Plus,
   TerminalSquareIcon,
 } from 'lucide-react';
-import {
-  FileUpload,
-  TooltipAnchor,
-  DropdownPopup,
-  AttachmentIcon,
-  SharePointIcon,
-} from '@librechat/client';
+import { FileUpload, TooltipAnchor, DropdownPopup, SharePointIcon } from '@librechat/client';
 import {
   Providers,
   EToolResources,
@@ -278,12 +273,12 @@ const AttachFileMenu = ({
           id="attach-file-menu-button"
           aria-label="Attach File Options"
           className={cn(
-            'flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50',
-            isPopoverActive && 'bg-surface-hover',
+            'flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] p-1 text-white/75 transition hover:border-white/20 hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50',
+            isPopoverActive && 'border-white/20 bg-white/[0.12] text-white',
           )}
         >
           <div className="flex w-full items-center justify-center gap-2">
-            <AttachmentIcon />
+            <Plus className="size-5" />
           </div>
         </Ariakit.MenuButton>
       }

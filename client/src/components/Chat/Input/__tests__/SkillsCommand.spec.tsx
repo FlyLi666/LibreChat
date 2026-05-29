@@ -23,6 +23,11 @@ const mockSetEphemeralAgent = jest.fn();
 const mockSetPendingManualSkills = jest.fn();
 const mockShowSkillsPopover = { current: true };
 
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => jest.fn(),
+}));
+
 jest.mock('recoil', () => {
   const actual = jest.requireActual('recoil');
   return {

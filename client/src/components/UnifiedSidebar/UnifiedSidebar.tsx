@@ -1,5 +1,6 @@
 import { useCallback, useState, useEffect, useRef, memo, startTransition } from 'react';
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useRecoilState } from 'recoil';
 import { useForm } from 'react-hook-form';
 import { useMediaQuery } from '@librechat/client';
@@ -7,14 +8,14 @@ import type { ChatFormValues } from '~/common';
 import { ChatContext, ChatFormProvider, ActivePanelProvider } from '~/Providers';
 import useUnifiedSidebarLinks from '~/hooks/Nav/useUnifiedSidebarLinks';
 import { useChatHelpers, useLocalize } from '~/hooks';
-import SidePanelNav from '~/components/SidePanel/Nav';
 import ExpandedPanel from './ExpandedPanel';
 import Sidebar from './Sidebar';
 import { cn } from '~/utils';
 import store from '~/store';
 
 const COLLAPSED_WIDTH = 52;
-const EXPANDED_MIN = 360;
+const EXPANDED_MIN = 180;
+const SECONDARY_PANEL_MIN = 620;
 const TRANSITION_MS = 300;
 const EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
@@ -41,13 +42,33 @@ function SidebarChatProvider({ children }: { children: ReactNode }) {
 
 function UnifiedSidebar() {
   const localize = useLocalize();
+  const location = useLocation();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const [expanded, setExpanded] = useRecoilState(store.sidebarExpanded);
   const [sidebarWidth, setSidebarWidth] = useState(getInitialWidth);
+  const [secondaryPanelOpen, setSecondaryPanelOpen] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandlers = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
 
-  const links = useUnifiedSidebarLinks();
+  const { workspaceLinks, assistantLinks, panelLinks } = useUnifiedSidebarLinks();
+  const isFullPageRoute =
+    location.pathname === '/image' ||
+    location.pathname === '/notebook' ||
+    location.pathname.startsWith('/community');
+  const panelExpanded = expanded && !isFullPageRoute;
+  const expandedMinWidth = secondaryPanelOpen ? SECONDARY_PANEL_MIN : EXPANDED_MIN;
+  let maxSidebarWidth: number | string = COLLAPSED_WIDTH;
+  if (panelExpanded) {
+    maxSidebarWidth = secondaryPanelOpen ? '50%' : '40%';
+  }
+
+  useEffect(() => {
+    if (isFullPageRoute) {
+      startTransition(() => {
+        setExpanded(false);
+      });
+    }
+  }, [isFullPageRoute, setExpanded]);
 
   const handleCollapse = useCallback(() => {
     startTransition(() => {
@@ -110,6 +131,14 @@ function UnifiedSidebar() {
     });
   }, []);
 
+  const handleSecondaryPanelChange = useCallback((open: boolean) => {
+    setSecondaryPanelOpen(open);
+    if (!open) {
+      return;
+    }
+    setSidebarWidth((width) => Math.max(width, SECONDARY_PANEL_MIN));
+  }, []);
+
   useEffect(() => {
     return () => {
       if (resizeHandlers.current) {
@@ -120,7 +149,7 @@ function UnifiedSidebar() {
   }, []);
 
   useEffect(() => {
-    if (!isSmallScreen || !expanded) {
+    if (!isSmallScreen || !panelExpanded) {
       return;
     }
     const handler = (e: KeyboardEvent) => {
@@ -130,7 +159,7 @@ function UnifiedSidebar() {
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isSmallScreen, expanded, handleCollapse]);
+  }, [isSmallScreen, panelExpanded, handleCollapse]);
 
   if (isSmallScreen) {
     return (
@@ -138,27 +167,29 @@ function UnifiedSidebar() {
         <div
           className={cn(
             'fixed left-0 top-0 z-[110] flex h-full bg-surface-primary-alt',
-            expanded ? 'translate-x-0' : '-translate-x-full',
+            panelExpanded ? 'translate-x-0' : '-translate-x-full',
           )}
           style={{
             width: 'min(85vw, 380px)',
             transition: `transform ${TRANSITION_MS}ms ${EASING}`,
           }}
-          inert={!expanded ? '' : undefined}
+          inert={!panelExpanded ? '' : undefined}
         >
           <SidebarChatProvider>
             <ActivePanelProvider>
-              <ExpandedPanel links={links} onCollapse={handleCollapse} />
-              <nav className="min-h-0 flex-1 overflow-hidden bg-surface-primary-alt">
-                <SidePanelNav links={links} />
-              </nav>
+              <ExpandedPanel
+                links={panelLinks}
+                workspaceLinks={workspaceLinks}
+                assistantLinks={assistantLinks}
+                onCollapse={handleCollapse}
+              />
             </ActivePanelProvider>
           </SidebarChatProvider>
         </div>
         <div
           className={cn(
             'fixed inset-0 z-[109] bg-black/50',
-            expanded ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+            panelExpanded ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
           )}
           style={{ transition: `opacity ${TRANSITION_MS}ms ${EASING}` }}
           role="presentation"
@@ -167,7 +198,7 @@ function UnifiedSidebar() {
             className="h-full w-full"
             onClick={handleCollapse}
             aria-label={localize('com_nav_close_sidebar')}
-            tabIndex={expanded ? 0 : -1}
+            tabIndex={panelExpanded ? 0 : -1}
           />
         </div>
       </>
@@ -180,9 +211,9 @@ function UnifiedSidebar() {
         <aside
           className="relative flex h-full flex-shrink-0 overflow-hidden"
           style={{
-            width: expanded ? sidebarWidth : COLLAPSED_WIDTH,
-            minWidth: expanded ? EXPANDED_MIN : COLLAPSED_WIDTH,
-            maxWidth: expanded ? '40%' : COLLAPSED_WIDTH,
+            width: panelExpanded ? sidebarWidth : COLLAPSED_WIDTH,
+            minWidth: panelExpanded ? expandedMinWidth : COLLAPSED_WIDTH,
+            maxWidth: maxSidebarWidth,
             transition: isResizing
               ? 'none'
               : `width ${TRANSITION_MS}ms ${EASING}, min-width ${TRANSITION_MS}ms ${EASING}, max-width ${TRANSITION_MS}ms ${EASING}`,
@@ -190,12 +221,15 @@ function UnifiedSidebar() {
           aria-label={localize('com_nav_control_panel')}
         >
           <Sidebar
-            links={links}
-            expanded={expanded}
+            workspaceLinks={workspaceLinks}
+            assistantLinks={assistantLinks}
+            panelLinks={panelLinks}
+            expanded={panelExpanded}
             onCollapse={handleCollapse}
             onExpand={handleExpand}
             onResizeStart={handleResizeStart}
             onResizeKeyboard={handleResizeKeyboard}
+            onSecondaryPanelChange={handleSecondaryPanelChange}
           />
         </aside>
       </ActivePanelProvider>

@@ -8,6 +8,7 @@ import * as q from './types/queries';
 import * as f from './types/files';
 import * as sk from './types/skills';
 import * as mcp from './types/mcpServers';
+import * as cm from './types/communityMarket';
 import * as config from './config';
 import request from './request';
 import * as s from './schemas';
@@ -612,6 +613,43 @@ export const getMarketplaceAgents = (params: {
       options: params,
     }),
   );
+};
+
+export const getCommunityMarketItems = (
+  kind: cm.MarketKind,
+  params?: cm.CommunityMarketQuery,
+): Promise<cm.CommunityMarketListResponse> => {
+  return request.get(endpoints.communityMarketItems(kind, params));
+};
+
+export const getCommunityMarketCategories = (
+  kind: cm.MarketKind,
+  params?: Pick<cm.CommunityMarketQuery, 'locale' | 'q' | 'search'>,
+): Promise<cm.CommunityMarketCategory[]> => {
+  return request.get(endpoints.communityMarketCategories(kind, params));
+};
+
+export const getCommunityMarketDetail = (
+  kind: cm.MarketKind,
+  identifier: string,
+  params?: Pick<cm.CommunityMarketQuery, 'locale'>,
+): Promise<cm.CommunityMarketDetail> => {
+  return request.get(endpoints.communityMarketDetail(kind, identifier, params));
+};
+
+export const getCommunityMarketInstallStatus = (
+  kind: cm.MarketKind,
+  identifier: string,
+  params?: Pick<cm.CommunityMarketQuery, 'locale'>,
+): Promise<cm.CommunityMarketInstallStatusResponse> => {
+  return request.get(endpoints.communityMarketInstallStatus(kind, identifier, params));
+};
+
+export const installCommunityMarketItem = (
+  kind: cm.MarketKind,
+  identifier: string,
+): Promise<cm.CommunityMarketInstallResponse> => {
+  return request.post(endpoints.communityMarketInstall(kind, identifier), {});
 };
 
 /* Tools */

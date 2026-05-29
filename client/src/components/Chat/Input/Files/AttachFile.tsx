@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { FileUpload, TooltipAnchor, AttachmentIcon } from '@librechat/client';
+import { Plus } from 'lucide-react';
+import { FileUpload, TooltipAnchor } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter } from '~/common';
 import { useFileHandlingNoChatContext, useLocalize } from '~/hooks';
@@ -41,7 +42,7 @@ const AttachFile = ({
             aria-label={localize('com_sidepanel_attach_files')}
             disabled={isUploadDisabled}
             className={cn(
-              'flex size-9 items-center justify-center rounded-full p-1 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50',
+              'flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] p-1 text-white/75 transition-colors hover:border-white/20 hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50',
             )}
             onKeyDownCapture={(e) => {
               if (!inputRef.current) {
@@ -61,7 +62,7 @@ const AttachFile = ({
             }}
           >
             <div className="flex w-full items-center justify-center gap-2">
-              <AttachmentIcon />
+              <Plus className="size-5" />
             </div>
           </button>
         }

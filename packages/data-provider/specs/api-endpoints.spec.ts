@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { buildLoginRedirectUrl } from '../src/api-endpoints';
+import { buildLoginRedirectUrl, conversations } from '../src/api-endpoints';
 
 describe('buildLoginRedirectUrl', () => {
   afterEach(() => {
@@ -70,5 +70,21 @@ describe('buildLoginRedirectUrl', () => {
     const result = buildLoginRedirectUrl('/c/loginhistory', '', '');
     expect(result).toContain('redirect_to=');
     expect(decodeURIComponent(result.split('redirect_to=')[1])).toBe('/c/loginhistory');
+  });
+});
+
+describe('conversations endpoint', () => {
+  it('includes agent_id with existing list params', () => {
+    const result = conversations({
+      agent_id: 'agent_123',
+      search: 'report',
+      tags: ['work'],
+      sortBy: 'updatedAt',
+      sortDirection: 'desc',
+    });
+
+    expect(result).toBe(
+      '/api/convos?agent_id=agent_123&search=report&tags=work&sortBy=updatedAt&sortDirection=desc',
+    );
   });
 });

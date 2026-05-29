@@ -1,42 +1,62 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import type { NavLink } from '~/common';
+import { DEFAULT_PANEL, resolveActivePanel, useActivePanel } from '~/Providers';
 import SidePanelNav from '~/components/SidePanel/Nav';
 import ExpandedPanel from './ExpandedPanel';
 import { cn } from '~/utils';
 
 function Sidebar({
-  links,
+  workspaceLinks,
+  assistantLinks,
+  panelLinks,
   expanded,
   onCollapse,
   onExpand,
   onResizeStart,
   onResizeKeyboard,
+  onSecondaryPanelChange,
 }: {
-  links: NavLink[];
+  workspaceLinks: NavLink[];
+  assistantLinks: NavLink[];
+  panelLinks: NavLink[];
   expanded: boolean;
   onCollapse: () => void;
   onExpand: () => void;
   onResizeStart: (e: React.MouseEvent) => void;
   onResizeKeyboard: (direction: 'shrink' | 'grow') => void;
+  onSecondaryPanelChange?: (open: boolean) => void;
 }) {
+  const { active } = useActivePanel();
+  const secondaryPanelLinks = panelLinks.filter((link) => link.id !== DEFAULT_PANEL);
+  const activePanelId = resolveActivePanel(active, panelLinks);
+  const showSecondaryPanel =
+    expanded && secondaryPanelLinks.some((link) => link.id === activePanelId && link.Component);
+
+  useEffect(() => {
+    onSecondaryPanelChange?.(showSecondaryPanel);
+  }, [onSecondaryPanelChange, showSecondaryPanel]);
+
   return (
     <>
       <div className="flex h-full w-full overflow-hidden">
         <ExpandedPanel
-          links={links}
+          links={panelLinks}
+          workspaceLinks={workspaceLinks}
+          assistantLinks={assistantLinks}
           expanded={expanded}
+          secondaryPanelOpen={showSecondaryPanel}
           onCollapse={onCollapse}
           onExpand={onExpand}
         />
         <nav
           className={cn(
-            'min-h-0 flex-1 overflow-hidden bg-surface-primary-alt',
-            expanded ? 'opacity-100' : 'pointer-events-none opacity-0',
+            'min-h-0 overflow-hidden border-r border-border-light bg-surface-primary-alt',
+            showSecondaryPanel ? 'w-full opacity-100' : 'pointer-events-none w-0 opacity-0',
           )}
           style={{ transition: expanded ? 'opacity 200ms ease 80ms' : 'opacity 150ms ease' }}
-          aria-hidden={!expanded}
+          aria-hidden={!showSecondaryPanel}
         >
-          <SidePanelNav links={links} />
+          <SidePanelNav links={secondaryPanelLinks} />
         </nav>
       </div>
       <div

@@ -1,7 +1,17 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import * as Ariakit from '@ariakit/react';
+import { useNavigate } from 'react-router-dom';
 import { TooltipAnchor, DropdownPopup, PinIcon, VectorIcon } from '@librechat/client';
-import { Globe, ScrollText, Settings, Settings2, TerminalSquareIcon } from 'lucide-react';
+import {
+  Bot,
+  Globe,
+  Plug,
+  ScrollText,
+  Settings,
+  Settings2,
+  Store,
+  TerminalSquareIcon,
+} from 'lucide-react';
 import type { MenuItemProps } from '~/common';
 import {
   AuthType,
@@ -21,8 +31,15 @@ interface ToolsDropdownProps {
   disabled?: boolean;
 }
 
+export function hasChatSelectableMCPServers(
+  manager: { selectableServers?: unknown[] } | null | undefined,
+): boolean {
+  return (manager?.selectableServers?.length ?? 0) > 0;
+}
+
 const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   const localize = useLocalize();
+  const navigate = useNavigate();
   const context = useBadgeRowContext();
   const { data: startupConfig } = useGetStartupConfig();
 
@@ -51,6 +68,11 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
 
   const canUseSkills = useHasAccess({
     permissionType: PermissionTypes.SKILLS,
+    permission: Permissions.USE,
+  });
+
+  const canUseAgents = useHasAccess({
+    permissionType: PermissionTypes.AGENTS,
     permission: Permissions.USE,
   });
 
@@ -134,6 +156,48 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   const mcpPlaceholder = startupConfig?.interface?.mcpServers?.placeholder;
 
   const dropdownItems: MenuItemProps[] = [];
+
+  if (canUseSkills && skillsEnabled) {
+    dropdownItems.push({
+      onClick: () => navigate('/community/skill'),
+      render: (props) => (
+        <div {...props}>
+          <div className="flex items-center gap-2">
+            <Store className="icon-md" aria-hidden="true" />
+            <span>{localize('com_ui_skill_store')}</span>
+          </div>
+        </div>
+      ),
+    });
+  }
+
+  if (canUseMcp) {
+    dropdownItems.push({
+      onClick: () => navigate('/community/mcp'),
+      render: (props) => (
+        <div {...props}>
+          <div className="flex items-center gap-2">
+            <Plug className="icon-md" aria-hidden="true" />
+            <span>{localize('com_ui_mcp_management')}</span>
+          </div>
+        </div>
+      ),
+    });
+  }
+
+  if (canUseAgents) {
+    dropdownItems.push({
+      onClick: () => navigate('/community/agent'),
+      render: (props) => (
+        <div {...props}>
+          <div className="flex items-center gap-2">
+            <Bot className="icon-md" aria-hidden="true" />
+            <span>{localize('com_ui_agent_store')}</span>
+          </div>
+        </div>
+      ),
+    });
+  }
 
   if (fileSearchEnabled && canUseFileSearch) {
     dropdownItems.push({
@@ -304,8 +368,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
     });
   }
 
-  const { availableMCPServers } = mcpServerManager ?? {};
-  if (canUseMcp && availableMCPServers && availableMCPServers.length > 0) {
+  if (canUseMcp && hasChatSelectableMCPServers(mcpServerManager)) {
     dropdownItems.push({
       hideOnClick: false,
       render: (props) => <MCPSubMenu {...props} placeholder={mcpPlaceholder} />,

@@ -15,6 +15,8 @@ const responses = require('./responses');
 const openai = require('./openai');
 const { v1 } = require('./v1');
 const chat = require('./chat');
+const channel = require('./channel');
+const { createWechatReplyHandler } = require('~/server/services/AgentChannelBridge');
 
 const { LIMIT_MESSAGE_IP, LIMIT_MESSAGE_USER } = process.env ?? {};
 
@@ -24,6 +26,8 @@ function hasTenantMismatch(job, user) {
 }
 
 const router = express.Router();
+channel.locals ??= {};
+channel.locals.wechatReplyHandler = createWechatReplyHandler();
 
 /**
  * Open Responses API routes (API key authentication handled in route file)
@@ -43,6 +47,7 @@ router.use(requireJwtAuth);
 router.use(checkBan);
 router.use(uaParser);
 
+router.use('/channel', channel);
 router.use('/', v1);
 
 /**

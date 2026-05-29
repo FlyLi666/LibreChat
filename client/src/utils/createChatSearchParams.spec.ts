@@ -1,8 +1,19 @@
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
 import type { TConversation, TPreset } from 'librechat-data-provider';
-import createChatSearchParams from './createChatSearchParams';
+import createChatSearchParams, { processValidSettings } from './createChatSearchParams';
 
 describe('createChatSearchParams', () => {
+  describe('processValidSettings', () => {
+    it('initializes an agent conversation from /c/new?agent_id=...', () => {
+      const result = processValidSettings({ agent_id: 'agent_123' });
+
+      expect(result).toMatchObject({
+        endpoint: EModelEndpoint.agents,
+        agent_id: 'agent_123',
+      });
+    });
+  });
+
   describe('conversation inputs', () => {
     it('handles basic conversation properties', () => {
       const conversation: Partial<TConversation> = {

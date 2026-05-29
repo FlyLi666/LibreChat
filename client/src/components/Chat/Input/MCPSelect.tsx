@@ -56,7 +56,13 @@ function MCPSelectContent() {
     getServerStatusIconProps,
   } = manager;
 
-  if (!isPinned && mcpValues?.length === 0) {
+  const hasSelectableServers = selectableServers.length > 0;
+
+  if (!hasSelectableServers) {
+    return null;
+  }
+
+  if (hasSelectableServers && !isPinned && mcpValues?.length === 0) {
     return null;
   }
 
@@ -135,13 +141,13 @@ function MCPSelectContent() {
 
 function MCPSelect() {
   const context = useBadgeRowContext();
-  const { selectableServers } = context?.mcpServerManager ?? {};
+  const { mcpServerManager } = context ?? {};
   const canUseMcp = useHasAccess({
     permissionType: PermissionTypes.MCP_SERVERS,
     permission: Permissions.USE,
   });
 
-  if (!canUseMcp || !selectableServers || selectableServers.length === 0) {
+  if (!canUseMcp || !mcpServerManager) {
     return null;
   }
 

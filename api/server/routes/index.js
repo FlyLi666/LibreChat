@@ -33,8 +33,10 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const images = require('./images');
+const communityMarket = require('./communityMarket');
 
 module.exports = {
+  communityMarket,
   mcp,
   images,
   auth,

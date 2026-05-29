@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ScrollText } from 'lucide-react';
 import { AutoSizer, List } from 'react-virtualized';
 import { Spinner, useCombobox } from '@librechat/client';
+import { useNavigate } from 'react-router-dom';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import type { TSkillSummary } from 'librechat-data-provider';
 import type { MentionOption } from '~/common';
@@ -87,6 +88,7 @@ function SkillsCommandContent({
   agentId?: string | null;
 }) {
   const localize = useLocalize();
+  const navigate = useNavigate();
   const setShowSkillsPopover = useSetRecoilState(store.showSkillsPopoverFamily(index));
   const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(conversationId));
   const setPendingManualSkills = useSetRecoilState(
@@ -353,8 +355,22 @@ function SkillsCommandContent({
           </div>
         )}
         {open && !isLoading && !isFetchingNextPage && !isError && matches.length === 0 && (
-          <div className="p-4 text-center text-sm text-text-secondary">
-            {localize(searchValue ? 'com_ui_no_skills_found' : 'com_ui_skills_empty')}
+          <div className="space-y-3 p-4 text-center text-sm text-text-secondary">
+            <p>{localize(searchValue ? 'com_ui_no_skills_found' : 'com_ui_skills_empty')}</p>
+            {!searchValue && (
+              <button
+                type="button"
+                className="rounded-lg border border-border-medium px-3 py-1.5 text-sm text-text-primary transition hover:bg-surface-hover"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setOpen(false);
+                  setShowSkillsPopover(false);
+                  navigate('/community/skill');
+                }}
+              >
+                {localize('com_ui_browse_skill_store')}
+              </button>
+            )}
           </div>
         )}
         {open && matches.length > 0 && (

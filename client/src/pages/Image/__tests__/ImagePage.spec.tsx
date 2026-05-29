@@ -3,6 +3,7 @@ import { RecoilRoot } from 'recoil';
 import '@testing-library/jest-dom/extend-expect';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { TImageBatch } from 'librechat-data-provider';
 import ImagePage, { filterDeletedGenerations, groupTopics, mergeImageBatches } from '../ImagePage';
 
@@ -16,31 +17,58 @@ let mockStartupConfig: Record<string, unknown> = {};
 let mockBatchesLoading = false;
 let mockBatches: unknown[] = [];
 let mockTopics: unknown[] = [];
+let mockLastBatchesTopicId: string | null | undefined = undefined;
 
 jest.mock('~/hooks', () => ({
-  useLocalize: () => (key: string) =>
-    ({
-      com_image_empty: '还没有作品，画点什么吧',
-      com_image_brand: 'HeZi LibreAI',
-      com_image_model: 'Model',
-      com_image_prompt_placeholder: '描述你想画的内容...',
-      com_image_generate: '生成',
-      com_image_action_delete: '删除',
-      com_image_action_download: '下载',
-      com_image_action_recreate: '重新生成',
-      com_image_action_zoom: '放大查看',
-      com_image_action_delete_batch: '删除整组',
-      com_ui_rename: '重命名',
-      com_image_config_size: '尺寸',
-      com_image_config_aspect: '比例',
-      com_image_config_resolution: '分辨率',
-      com_image_config_quality: '质量',
-      com_image_config_image_num: '数量',
-      com_image_reference_image: '参考图',
-      com_image_new_topic: '新建主题',
-      com_nav_image_gen: '生图',
-      com_nav_open_sidebar: '打开侧边栏',
-    })[key] ?? key,
+  useLocalize: () => (key: string, values?: Record<string, unknown>) => {
+    const text =
+      {
+        com_image_empty: '还没有作品，画点什么吧',
+        com_image_brand: 'HeZi LibreAI',
+        com_image_model: 'Model',
+        com_image_prompt_placeholder: '描述你想要生成的内容',
+        com_image_generate: '生成',
+        com_image_action_delete: '删除',
+        com_image_action_download: '下载',
+        com_image_action_recreate: '重新生成',
+        com_image_action_zoom: '放大查看',
+        com_image_action_delete_batch: '删除整组',
+        com_image_action_copy_prompt: '复制提示词',
+        com_image_action_optimize_prompt: '提示优化',
+        com_image_action_reuse_settings: '复用设置',
+        com_image_close_topics: '关闭图片主题',
+        com_image_count: '{{count}} 张图片',
+        com_image_collapse_sidebar: '收起图片侧栏',
+        com_image_create_title: '即刻创作',
+        com_image_create_topic: '创作新主题',
+        com_image_empty_topic: '这个主题还没有图片，继续描述你想生成的内容',
+        com_image_generation_failed_hint: '生成遇到了问题。你可以重试，或调整描述后再试',
+        com_image_generating: '生成中...',
+        com_image_mode_image: '图片',
+        com_image_open_sidebar: '打开图片侧栏',
+        com_image_open_topics: '打开图片主题',
+        com_image_parameters: '图像参数',
+        com_image_topic_count: '图片主题 {{count}}',
+        com_image_topic_view: '图片主题视图',
+        com_image_topic_view_grid: '网格视图',
+        com_image_topic_view_list: '列表视图',
+        com_image_topics: '图片主题',
+        com_ui_search: '搜索',
+        com_ui_untitled: '未命名',
+        com_ui_rename: '重命名',
+        com_image_config_size: '尺寸',
+        com_image_config_aspect: '比例',
+        com_image_config_resolution: '分辨率',
+        com_image_config_quality: '质量',
+        com_image_config_image_num: '数量',
+        com_image_reference_image: '参考图',
+        com_image_new_topic: '新建主题',
+        com_nav_image_gen: '生图',
+        com_nav_open_sidebar: '打开侧边栏',
+      }[key] ?? key;
+
+    return text.replace(/\{\{(\w+)\}\}/g, (_match, name) => String(values?.[name] ?? ''));
+  },
 }));
 
 jest.mock('~/data-provider', () => ({
@@ -85,7 +113,10 @@ jest.mock('~/data-provider/Images', () => ({
     ],
   }),
   useImageTopicsQuery: () => ({ data: mockTopics }),
-  useImageBatchesQuery: () => ({ data: mockBatches, isLoading: mockBatchesLoading }),
+  useImageBatchesQuery: (topicId: string | null) => {
+    mockLastBatchesTopicId = topicId;
+    return { data: mockBatches, isLoading: mockBatchesLoading };
+  },
   useGenerateImageMutation: () => ({
     mutateAsync: mockGenerateImage,
     isLoading: false,
@@ -112,15 +143,23 @@ jest.mock('~/data-provider/Images', () => ({
   }),
 }));
 
-function renderPage() {
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="route-location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function renderPage(route = '/image') {
   return render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <RecoilRoot>
-        <ImagePage />
-      </RecoilRoot>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={[route]}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <RecoilRoot>
+          <LocationProbe />
+          <ImagePage />
+        </RecoilRoot>
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -150,6 +189,8 @@ describe('ImagePage', () => {
     mockTopics = [];
     mockBatches = [];
     mockBatchesLoading = false;
+    mockLastBatchesTopicId = undefined;
+    window.localStorage.clear();
   });
 
   it('groups topics by today, yesterday, past 7 days, and older dates', () => {
@@ -167,11 +208,27 @@ describe('ImagePage', () => {
     ]);
 
     expect(groups.map((group) => [group.label, group.topics.map((topic) => topic._id)])).toEqual([
-      ['今天', ['topic-today']],
-      ['昨天', ['topic-yesterday']],
-      ['过去 7 天', ['topic-week']],
-      ['更早', ['topic-old']],
+      ['Today', ['topic-today']],
+      ['Yesterday', ['topic-yesterday']],
+      ['Previous 7 days', ['topic-week']],
+      ['Older', ['topic-old']],
     ]);
+    jest.useRealTimers();
+  });
+
+  it('supports localized topic group labels', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-29T12:00:00+08:00'));
+    const groups = groupTopics(
+      [{ _id: 'topic-today', title: '今日主题', type: 'image', updatedAt: '2026-05-29T02:00:00Z' }],
+      {
+        older: '更早',
+        previous7Days: '过去 7 天',
+        today: '今天',
+        yesterday: '昨天',
+      },
+    );
+
+    expect(groups[0].label).toBe('今天');
     jest.useRealTimers();
   });
 
@@ -259,6 +316,64 @@ describe('ImagePage', () => {
 
     expect(screen.getByText('即刻创作')).toBeInTheDocument();
     expect(screen.queryByText('生成中...')).not.toBeInTheDocument();
+  });
+
+  it('keeps /image on the home state instead of auto-selecting the first topic', async () => {
+    mockTopics = [{ _id: 'topic-1', title: 'One Cat', type: 'image' }];
+
+    renderPage('/image');
+
+    await waitFor(() => {
+      expect(mockLastBatchesTopicId).toBeNull();
+    });
+    expect(screen.getByTestId('route-location')).toHaveTextContent('/image');
+    expect(screen.getByText('即刻创作')).toBeInTheDocument();
+  });
+
+  it('syncs the active image topic with the topic query param', async () => {
+    mockTopics = [
+      { _id: 'topic-1', title: 'One Cat', type: 'image' },
+      { _id: 'topic-2', title: 'Two Cats', type: 'image' },
+    ];
+
+    renderPage('/image?topic=topic-1');
+
+    await waitFor(() => {
+      expect(mockLastBatchesTopicId).toBe('topic-1');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Two Cats' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('route-location')).toHaveTextContent('/image?topic=topic-2');
+      expect(mockLastBatchesTopicId).toBe('topic-2');
+    });
+  });
+
+  it('switches image topics between grid and list views and persists the choice', () => {
+    mockTopics = [{ _id: 'topic-1', title: 'One Cat', type: 'image' }];
+
+    renderPage('/image?topic=topic-1');
+
+    const topicButton = screen.getByRole('button', { name: 'One Cat' });
+    expect(topicButton).toHaveClass('aspect-square');
+
+    fireEvent.click(screen.getByRole('button', { name: '列表视图' }));
+
+    expect(screen.getByRole('button', { name: 'One Cat' })).toHaveClass('h-11');
+    expect(window.localStorage.getItem('hezi:imageTopicViewMode')).toBe('list');
+  });
+
+  it('collapses and restores the image topic accordion', () => {
+    mockTopics = [{ _id: 'topic-1', title: 'One Cat', type: 'image' }];
+
+    renderPage('/image?topic=topic-1');
+
+    expect(screen.getByRole('button', { name: 'One Cat' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '图片主题 1' }));
+    expect(screen.queryByRole('button', { name: 'One Cat' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '图片主题 1' }));
+    expect(screen.getByRole('button', { name: 'One Cat' })).toBeInTheDocument();
   });
 
   it('adapts parameter controls when switching models', () => {

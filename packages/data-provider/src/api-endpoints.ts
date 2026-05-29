@@ -1,4 +1,5 @@
 import type { AssistantsEndpoint } from './schemas';
+import type { CommunityMarketQuery, MarketKind } from './types/communityMarket';
 import * as q from './types/queries';
 import { ResourceType } from './accessPermissions';
 
@@ -434,6 +435,40 @@ export const updateRemoteAgentsPermissions = (roleName: string) =>
 export const updateMarketplacePermissions = (roleName: string) =>
   `${getRole(roleName)}/marketplace`;
 export const updateSkillPermissions = (roleName: string) => `${getRole(roleName)}/skills`;
+
+/* Community Market */
+const communityMarketRoot = `${BASE_URL}/api/community-market`;
+const communityMarketPaths: Record<MarketKind, string> = {
+  skill: 'skills',
+  mcp: 'mcp',
+  agent: 'agents',
+};
+
+export const communityMarketItems = (kind: MarketKind, params: CommunityMarketQuery = {}) =>
+  `${communityMarketRoot}/${communityMarketPaths[kind]}${buildQuery(params)}`;
+
+export const communityMarketCategories = (
+  kind: MarketKind,
+  params: Pick<CommunityMarketQuery, 'locale' | 'q' | 'search'> = {},
+) => `${communityMarketItems(kind, {})}/categories${buildQuery(params)}`;
+
+export const communityMarketDetail = (
+  kind: MarketKind,
+  identifier: string,
+  params: Pick<CommunityMarketQuery, 'locale'> = {},
+) => `${communityMarketItems(kind, {})}/${encodeURIComponent(identifier)}${buildQuery(params)}`;
+
+export const communityMarketInstall = (kind: MarketKind, identifier: string) =>
+  `${communityMarketItems(kind, {})}/${encodeURIComponent(identifier)}/install`;
+
+export const communityMarketInstallStatus = (
+  kind: MarketKind,
+  identifier: string,
+  params: Pick<CommunityMarketQuery, 'locale'> = {},
+) =>
+  `${communityMarketItems(kind, {})}/${encodeURIComponent(identifier)}/install-status${buildQuery(
+    params,
+  )}`;
 
 /* Conversation Tags */
 export const conversationTags = (tag?: string) =>

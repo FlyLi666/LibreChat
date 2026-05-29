@@ -658,6 +658,43 @@ describe('Conversation Operations', () => {
       expect(result?.convoMap[expiredRetainedConvo.conversationId]).toBeUndefined();
       expect(result?.convoMap[tempConvo.conversationId]).toBeUndefined();
     });
+
+    it('should filter conversations by agent_id when provided', async () => {
+      const agentConvo = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Agent Conversation',
+        endpoint: EModelEndpoint.agents,
+        agent_id: 'agent_123',
+        isTemporary: false,
+        updatedAt: new Date('2026-05-29T12:00:00.000Z'),
+      });
+
+      await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Other Agent Conversation',
+        endpoint: EModelEndpoint.agents,
+        agent_id: 'agent_456',
+        isTemporary: false,
+        updatedAt: new Date('2026-05-29T11:00:00.000Z'),
+      });
+
+      await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Regular Conversation',
+        endpoint: EModelEndpoint.openAI,
+        isTemporary: false,
+        updatedAt: new Date('2026-05-29T10:00:00.000Z'),
+      });
+
+      const result = await getConvosByCursor('user123', { agent_id: 'agent_123' });
+
+      expect(result.conversations).toHaveLength(1);
+      expect(result.conversations[0].conversationId).toBe(agentConvo.conversationId);
+      expect(result.conversations[0].agent_id).toBe('agent_123');
+    });
   });
 
   describe('searchConversation', () => {

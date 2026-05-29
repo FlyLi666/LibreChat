@@ -1,8 +1,9 @@
 import { memo, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useMediaQuery } from '@librechat/client';
+import { Bot } from 'lucide-react';
 import { getConfigDefaults, PermissionTypes, Permissions } from 'librechat-data-provider';
-import ModelSelector from './Menus/Endpoints/ModelSelector';
+import { useParams } from 'react-router-dom';
 import { useGetStartupConfig } from '~/data-provider';
 import ExportAndShareMenu from './ExportAndShareMenu';
 import { OpenSidebar, PresetsMenu } from './Menus';
@@ -17,7 +18,9 @@ const defaultInterface = getConfigDefaults().interface;
 
 function Header() {
   const { data: startupConfig } = useGetStartupConfig();
+  const { agentId } = useParams();
   const navVisible = useRecoilValue(store.sidebarExpanded);
+  const conversation = useRecoilValue(store.conversationByIndex(0));
 
   const interfaceConfig = useMemo(
     () => startupConfig?.interface ?? defaultInterface,
@@ -40,6 +43,9 @@ function Header() {
   });
 
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  const topicTitle =
+    conversation?.title && conversation.title !== 'New Chat' ? conversation.title : '新话题';
+  const agentLabel = agentId === 'lobe-ai' ? 'Lobe AI' : agentId;
 
   return (
     <div className="via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 absolute top-0 z-10 flex h-[52px] w-full items-center justify-between bg-gradient-to-b from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">
@@ -53,12 +59,19 @@ function Header() {
                 !isSmallScreen ? 'transition-all duration-200 ease-in-out' : '',
               )}
             >
-              <ModelSelector startupConfig={startupConfig} />
-              {interfaceConfig.presets === true && interfaceConfig.modelSelect && <PresetsMenu />}
-              {hasAccessToBookmarks === true && <BookmarkMenu />}
-              {hasAccessToMultiConvo === true && <AddMultiConvo />}
+              <div className="flex h-9 max-w-[42vw] items-center gap-2 rounded-xl border border-border-light bg-presentation px-3 py-2 text-sm text-text-primary">
+                <Bot className="h-4 w-4 flex-shrink-0 text-text-secondary" aria-hidden="true" />
+                <span className="truncate">
+                  {agentLabel ? `${agentLabel} / ${topicTitle}` : topicTitle}
+                </span>
+              </div>
               {isSmallScreen && (
                 <>
+                  {interfaceConfig.presets === true && interfaceConfig.modelSelect && (
+                    <PresetsMenu />
+                  )}
+                  {hasAccessToBookmarks === true && <BookmarkMenu />}
+                  {hasAccessToMultiConvo === true && <AddMultiConvo />}
                   <ExportAndShareMenu
                     isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
                   />
@@ -71,6 +84,9 @@ function Header() {
 
         {!isSmallScreen && (
           <div className="flex items-center gap-2">
+            {interfaceConfig.presets === true && interfaceConfig.modelSelect && <PresetsMenu />}
+            {hasAccessToBookmarks === true && <BookmarkMenu />}
+            {hasAccessToMultiConvo === true && <AddMultiConvo />}
             <ExportAndShareMenu
               isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
             />

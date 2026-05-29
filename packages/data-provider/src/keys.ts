@@ -46,6 +46,10 @@ export enum QueryKeys {
   randomPrompts = 'randomPrompts',
   agentCategories = 'agentCategories',
   marketplaceAgents = 'marketplaceAgents',
+  communityMarketItems = 'communityMarketItems',
+  communityMarketCategories = 'communityMarketCategories',
+  communityMarketDetail = 'communityMarketDetail',
+  communityMarketInstallStatus = 'communityMarketInstallStatus',
   roles = 'roles',
   rolesList = 'rolesList',
   conversationTags = 'conversationTags',
@@ -121,4 +125,5 @@ export enum MutationKeys {
   updateSkillNode = 'updateSkillNode',
   deleteSkillNode = 'deleteSkillNode',
   updateSkillNodeContent = 'updateSkillNodeContent',
+  installCommunityMarketItem = 'installCommunityMarketItem',
 }

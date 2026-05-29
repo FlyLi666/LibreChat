@@ -39,11 +39,19 @@ jest.mock('../ChatRoute', () => ({
   __esModule: true,
   default: () => null,
 }));
+jest.mock('../AgentRoute', () => ({
+  __esModule: true,
+  default: () => null,
+}));
 jest.mock('../Search', () => ({
   __esModule: true,
   default: () => null,
 }));
 jest.mock('~/pages/Image', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+jest.mock('~/pages/CommunityMarket', () => ({
   __esModule: true,
   default: () => null,
 }));
@@ -83,5 +91,20 @@ describe('skills routes', () => {
     const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
 
     expect(paths).toContain('image');
+  });
+
+  it('registers the assistant route layer', () => {
+    const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
+
+    expect(paths).toContain('agent/:agentId');
+    expect(paths).toContain('agent/:agentId/:conversationId?');
+  });
+
+  it('registers the community market route', () => {
+    const paths = flattenPaths((router as unknown as { routes: RouteNode[] }).routes);
+
+    expect(paths).toContain('community');
+    expect(paths).toContain('community/:tab');
+    expect(paths).toContain('community/:tab/:identifier');
   });
 });
