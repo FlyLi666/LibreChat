@@ -1,7 +1,7 @@
 import React from 'react';
 import { RecoilRoot } from 'recoil';
 import '@testing-library/jest-dom/extend-expect';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { TImageBatch } from 'librechat-data-provider';
 import ImagePage, { filterDeletedGenerations, groupTopics, mergeImageBatches } from '../ImagePage';
@@ -187,10 +187,17 @@ describe('ImagePage', () => {
     expect(screen.getAllByText('数量').length).toBeGreaterThan(0);
   });
 
-  it('renders a mobile-safe sidebar opener', () => {
+  it('renders mobile-safe global and image topic openers', () => {
     renderPage();
 
     expect(screen.getByTestId('open-sidebar-button')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '打开图片主题' }));
+
+    const topicDrawer = screen.getByTestId('image-topic-drawer');
+    expect(topicDrawer).toBeInTheDocument();
+    expect(within(topicDrawer).getByRole('button', { name: '新建主题' })).toBeInTheDocument();
+    fireEvent.click(within(topicDrawer).getByRole('button', { name: '关闭图片主题' }));
+    expect(screen.queryByTestId('image-topic-drawer')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '生图' })).toBeInTheDocument();
   });
 
@@ -393,6 +400,36 @@ describe('ImagePage', () => {
       expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
     });
     expect(screen.getByText('即刻创作')).toBeInTheDocument();
+  });
+
+  it('keeps the composer outside the history scroll when generations exist', () => {
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '画一只穿宇航服的猫',
+        params: {},
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'succeeded',
+            asset: { url: '/images/user-123/cat.png' },
+          },
+        ],
+      },
+    ];
+
+    renderPage();
+
+    const historyScroll = screen.getByTestId('image-history-scroll');
+    const composerDock = screen.getByTestId('image-composer-dock');
+    const promptInput = screen.getByPlaceholderText('描述你想要生成的内容');
+
+    expect(historyScroll).toContainElement(screen.getByAltText('画一只穿宇航服的猫'));
+    expect(historyScroll).not.toContainElement(promptInput);
+    expect(composerDock).toContainElement(promptInput);
   });
 
   it('deletes a full image batch from the feed', async () => {

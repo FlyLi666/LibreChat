@@ -207,8 +207,10 @@ function ParamControl({
 function TopicSidebar({
   topics,
   activeTopicId,
+  mobileOpen = false,
   onSelect,
   onNewTopic,
+  onMobileClose,
   onRenameTopic,
   onDeleteTopic,
   renaming,
@@ -216,8 +218,10 @@ function TopicSidebar({
 }: {
   topics: TImageTopic[];
   activeTopicId: string | null;
+  mobileOpen?: boolean;
   onSelect: (topicId: string) => void;
   onNewTopic: () => void;
+  onMobileClose?: () => void;
   onRenameTopic: (topicId: string, title: string) => Promise<void>;
   onDeleteTopic: (topicId: string) => Promise<void>;
   renaming: boolean;
@@ -257,107 +261,143 @@ function TopicSidebar({
 
   const topicLabel = `图片主题 ${filteredTopics.length}`;
 
-  return (
-    <aside className="hidden w-[448px] shrink-0 border-r border-border-light bg-[#f7f7f8] text-text-primary lg:flex lg:flex-col">
-      <div className="flex h-16 items-center justify-between border-b border-border-light px-5">
-        <div className="flex items-center gap-2 text-sm font-medium text-text-secondary">
-          <Home className="h-4 w-4" />
-          <ChevronDown className="h-3.5 w-3.5 -rotate-90 text-text-tertiary" />
-          <span className="text-text-primary">{imageModeLabel}</span>
+  const selectTopic = (topicId: string) => {
+    onSelect(topicId);
+    onMobileClose?.();
+  };
+
+  const createTopic = () => {
+    onNewTopic();
+    onMobileClose?.();
+  };
+
+  const renderHeader = (mobile = false) => (
+    <div className="flex h-16 items-center justify-between border-b border-border-light px-5">
+      <div className="flex items-center gap-2 text-sm font-medium text-text-secondary">
+        <Home className="h-4 w-4" />
+        <ChevronDown className="h-3.5 w-3.5 -rotate-90 text-text-tertiary" />
+        <span className="text-text-primary">{imageModeLabel}</span>
+      </div>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-8 rounded-lg text-text-tertiary"
+        aria-label={mobile ? '关闭图片主题' : '收起图片侧栏'}
+        onClick={mobile ? onMobileClose : undefined}
+      >
+        {mobile ? <X className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </Button>
+    </div>
+  );
+
+  const renderTopics = () => (
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+      <button
+        className="flex h-11 items-center gap-3 rounded-xl px-1 text-left text-[15px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+        onClick={createTopic}
+      >
+        <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-white">
+          <Plus className="h-4 w-4" />
+        </span>
+        <span>{localize('com_image_new_topic')}</span>
+      </button>
+      <label className="flex h-11 items-center gap-3 rounded-xl px-1 text-[15px] text-text-tertiary">
+        <Search className="h-5 w-5" />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-text-primary outline-none placeholder:text-text-tertiary"
+          placeholder="搜索"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
+      <section className="min-h-0">
+        <div className="mb-6 flex items-center gap-2 text-sm font-medium text-text-tertiary">
+          <span>{topicLabel}</span>
+          <ChevronDown className="h-4 w-4" />
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8 rounded-lg text-text-tertiary"
-          aria-label="收起图片侧栏"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
-        <button
-          className="flex h-11 items-center gap-3 rounded-xl px-1 text-left text-[15px] font-medium text-text-secondary transition-colors hover:text-text-primary"
-          onClick={onNewTopic}
-        >
-          <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-white">
-            <Plus className="h-4 w-4" />
-          </span>
-          <span>{localize('com_image_new_topic')}</span>
-        </button>
-        <label className="flex h-11 items-center gap-3 rounded-xl px-1 text-[15px] text-text-tertiary">
-          <Search className="h-5 w-5" />
-          <input
-            className="min-w-0 flex-1 bg-transparent text-text-primary outline-none placeholder:text-text-tertiary"
-            placeholder="搜索"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <section className="min-h-0">
-          <div className="mb-6 flex items-center gap-2 text-sm font-medium text-text-tertiary">
-            <span>{topicLabel}</span>
-            <ChevronDown className="h-4 w-4" />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {filteredTopics.map((topic) => (
-              <div key={topic._id} className="group relative">
-                {editingTopicId === topic._id ? (
-                  <input
-                    className="aspect-square w-full rounded-xl border border-border-medium bg-white px-2 text-center text-sm font-medium text-text-primary outline-none"
-                    value={editingTitle}
-                    onBlur={() => void saveRename(topic)}
-                    onChange={(event) => setEditingTitle(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        void saveRename(topic);
-                      }
-                      if (event.key === 'Escape') {
-                        cancelRename();
-                      }
-                    }}
-                  />
-                ) : (
-                  <button
-                    className={cn(
-                      'flex aspect-square w-full items-center justify-center rounded-xl border text-center text-3xl font-semibold transition-all',
-                      topic._id === activeTopicId
-                        ? 'border-border-medium bg-white text-text-primary shadow-sm ring-2 ring-black/5'
-                        : 'border-transparent bg-[#e9e9ea] text-black hover:bg-white hover:shadow-sm',
-                    )}
-                    title={topic.title}
-                    onClick={() => onSelect(topic._id)}
-                  >
-                    <span className="line-clamp-2 px-2">{topic.title || '未命名'}</span>
-                  </button>
-                )}
-                <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7 rounded-lg bg-white/90 shadow-sm"
-                    aria-label={localize('com_ui_rename')}
-                    disabled={renaming || editingTopicId === topic._id}
-                    onClick={() => beginRename(topic)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7 rounded-lg bg-white/90 shadow-sm"
-                    aria-label={localize('com_image_action_delete')}
-                    disabled={deleting}
-                    onClick={() => void onDeleteTopic(topic._id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+        <div className="grid grid-cols-3 gap-3">
+          {filteredTopics.map((topic) => (
+            <div key={topic._id} className="group relative">
+              {editingTopicId === topic._id ? (
+                <input
+                  className="aspect-square w-full rounded-xl border border-border-medium bg-white px-2 text-center text-sm font-medium text-text-primary outline-none"
+                  value={editingTitle}
+                  onBlur={() => void saveRename(topic)}
+                  onChange={(event) => setEditingTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      void saveRename(topic);
+                    }
+                    if (event.key === 'Escape') {
+                      cancelRename();
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  className={cn(
+                    'flex aspect-square w-full items-center justify-center rounded-xl border text-center text-3xl font-semibold transition-all',
+                    topic._id === activeTopicId
+                      ? 'border-border-medium bg-white text-text-primary shadow-sm ring-2 ring-black/5'
+                      : 'border-transparent bg-[#e9e9ea] text-black hover:bg-white hover:shadow-sm',
+                  )}
+                  title={topic.title}
+                  onClick={() => selectTopic(topic._id)}
+                >
+                  <span className="line-clamp-2 px-2">{topic.title || '未命名'}</span>
+                </button>
+              )}
+              <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7 rounded-lg bg-white/90 shadow-sm"
+                  aria-label={localize('com_ui_rename')}
+                  disabled={renaming || editingTopicId === topic._id}
+                  onClick={() => beginRename(topic)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7 rounded-lg bg-white/90 shadow-sm"
+                  aria-label={localize('com_image_action_delete')}
+                  disabled={deleting}
+                  onClick={() => void onDeleteTopic(topic._id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+
+  return (
+    <>
+      <aside className="hidden w-[448px] shrink-0 border-r border-border-light bg-[#f7f7f8] text-text-primary lg:flex lg:flex-col">
+        {renderHeader()}
+        {renderTopics()}
+      </aside>
+      {mobileOpen && (
+        <>
+          <div className="fixed inset-0 z-[105] bg-black/40 lg:hidden" role="presentation">
+            <button className="h-full w-full" aria-label="关闭图片主题" onClick={onMobileClose} />
           </div>
-        </section>
-      </div>
-    </aside>
+          <aside
+            data-testid="image-topic-drawer"
+            className="fixed left-0 top-0 z-[106] flex h-dvh w-[min(88vw,390px)] flex-col border-r border-border-light bg-[#f7f7f8] text-text-primary shadow-2xl lg:hidden"
+            aria-label="图片主题"
+          >
+            {renderHeader(true)}
+            {renderTopics()}
+          </aside>
+        </>
+      )}
+    </>
   );
 }
 
@@ -693,6 +733,7 @@ export default function ImagePage() {
   const [prompt, setPrompt] = useState('');
   const [inlineBatches, setInlineBatches] = useState<TImageBatch[]>([]);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [topicsPanelOpen, setTopicsPanelOpen] = useState(false);
   const [deletedGenerationIds, setDeletedGenerationIds] = useState<Set<string>>(() => new Set());
   const [deletedBatchIds, setDeletedBatchIds] = useState<Set<string>>(() => new Set());
 
@@ -750,6 +791,10 @@ export default function ImagePage() {
   const selectingInitialTopic = !activeTopicId && topics.length > 0;
   const isLoadingBatches = hasActiveTopic && batchesLoading;
   const hasBatchesError = hasActiveTopic && batchesError;
+  const isWorkspaceBusy =
+    modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches;
+  const hasWorkspaceError = modelsError || topicsError || hasBatchesError;
+  const shouldDockComposer = !isWorkspaceBusy && !hasWorkspaceError && displayedBatches.length > 0;
 
   const submit = async () => {
     const trimmed = prompt.trim();
@@ -866,7 +911,7 @@ export default function ImagePage() {
   );
 
   const renderWorkspace = () => {
-    if (modelsLoading || topicsLoading || selectingInitialTopic || isLoadingBatches) {
+    if (isWorkspaceBusy) {
       return (
         <div className="flex h-full min-h-[420px] items-center justify-center text-sm text-text-secondary">
           {localize('com_image_generating')}
@@ -874,7 +919,7 @@ export default function ImagePage() {
       );
     }
 
-    if (modelsError || topicsError || hasBatchesError) {
+    if (hasWorkspaceError) {
       return (
         <div className="flex h-full min-h-[420px] items-center justify-center px-4 text-center text-sm text-red-600">
           {localize('com_image_error_no_channel')}
@@ -900,48 +945,70 @@ export default function ImagePage() {
     }
 
     return (
-      <div className="flex min-h-full flex-col gap-6 px-4 py-6">
-        <div className="mx-auto grid w-full max-w-4xl flex-1 gap-4">
-          {displayedBatches.map((batch) => (
-            <GenerationCard
-              key={batch._id}
-              batch={batch}
-              deletingBatch={deleteBatchMutation.isLoading}
-              deleting={deleteGenerationMutation.isLoading}
-              generating={generateMutation.isLoading}
-              onDeleteBatch={deleteBatch}
-              onDeleteGeneration={deleteGeneration}
-              onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
-            />
-          ))}
-        </div>
-        {renderPromptComposer()}
+      <div className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-6">
+        {displayedBatches.map((batch) => (
+          <GenerationCard
+            key={batch._id}
+            batch={batch}
+            deletingBatch={deleteBatchMutation.isLoading}
+            deleting={deleteGenerationMutation.isLoading}
+            generating={generateMutation.isLoading}
+            onDeleteBatch={deleteBatch}
+            onDeleteGeneration={deleteGeneration}
+            onRecreateBatch={(nextBatch) => void recreateBatch(nextBatch)}
+          />
+        ))}
       </div>
     );
   };
 
   return (
-    <div className="flex h-full w-full bg-[#f7f7f8] text-text-primary">
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-[#f7f7f8] text-text-primary">
       <TopicSidebar
         topics={topics}
         activeTopicId={activeTopicId}
+        mobileOpen={topicsPanelOpen}
         onSelect={setActiveTopicId}
         onNewTopic={startNewTopic}
+        onMobileClose={() => setTopicsPanelOpen(false)}
         onRenameTopic={renameTopic}
         onDeleteTopic={deleteTopic}
         renaming={updateTopicMutation.isLoading}
         deleting={deleteTopicMutation.isLoading}
       />
-      <main className="flex min-w-0 flex-1 flex-col bg-[#f1f1f2]">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f1f1f2]">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border-light bg-surface-primary px-3 md:hidden">
           <OpenSidebar />
           <h1 className="min-w-0 truncate text-sm font-semibold text-text-primary">
             {localize('com_nav_image_gen')}
           </h1>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="ml-auto size-9 rounded-xl text-text-secondary"
+            aria-label="打开图片主题"
+            onClick={() => setTopicsPanelOpen(true)}
+          >
+            <ImageIcon className="h-4 w-4" />
+          </Button>
         </div>
         <div className="min-h-0 flex-1 p-2 md:p-4">
           <div className="h-full overflow-hidden rounded-[22px] border border-border-light bg-white shadow-sm">
-            <div className="h-full overflow-y-auto">{renderWorkspace()}</div>
+            {shouldDockComposer ? (
+              <div className="flex h-full min-h-0 flex-col">
+                <div data-testid="image-history-scroll" className="min-h-0 flex-1 overflow-y-auto">
+                  {renderWorkspace()}
+                </div>
+                <div
+                  data-testid="image-composer-dock"
+                  className="shrink-0 border-t border-border-light bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.04)] md:px-4"
+                >
+                  {renderPromptComposer()}
+                </div>
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto">{renderWorkspace()}</div>
+            )}
           </div>
         </div>
       </main>
