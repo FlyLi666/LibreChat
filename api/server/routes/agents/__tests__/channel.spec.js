@@ -184,6 +184,7 @@ describe('agent channel routes', () => {
       ok: true,
       text: async () => JSON.stringify({ ret: 0 }),
     }));
+    jest.spyOn(channelRouter._internals.AgentChannelProvider, 'updateOne').mockResolvedValue({});
 
     const result = await channelRouter._internals.handleWechatInboundMessage({
       credentials: { baseurl: 'https://ilink.test', botToken: 'bot-token-123' },
@@ -212,6 +213,55 @@ describe('agent channel routes', () => {
       }),
     );
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips inbound WeChat messages that were already processed', async () => {
+    const replyHandler = jest.fn(async ({ text }) => `reply: ${text}`);
+    channelRouter.locals.wechatReplyHandler = replyHandler;
+    const message = {
+      context_token: 'ctx-duplicate',
+      from_user_id: 'wechat-user-1@im.wechat',
+      item_list: [{ text_item: { text: 'ping' }, type: 1 }],
+    };
+    const messageKey = channelRouter._internals.getWechatMessageKey(message.context_token);
+
+    const result = await channelRouter._internals.handleWechatInboundMessage({
+      credentials: { baseurl: 'https://ilink.test', botToken: 'bot-token-123' },
+      message,
+      provider: {
+        _id: { toString: () => 'provider-123' },
+        agentId: 'agent-real-id',
+        applicationId: 'bot-id-123',
+        platform: 'wechat',
+        settings: {
+          processedWechatMessages: {
+            [messageKey]: { processedAt: new Date() },
+          },
+        },
+        user: 'user-123',
+      },
+    });
+
+    expect(result).toEqual({ duplicate: true, skipped: true });
+    expect(replyHandler).not.toHaveBeenCalled();
+  });
+
+  it('drains a one-shot WeChat backlog without replying', async () => {
+    const updateOne = jest
+      .spyOn(channelRouter._internals.AgentChannelProvider, 'updateOne')
+      .mockResolvedValue({});
+
+    await channelRouter._internals.drainWechatBacklog('provider-drain', 'cursor-after-drain');
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'provider-drain' },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          cursor: 'cursor-after-drain',
+          'settings.skipNextWechatBacklog': false,
+        }),
+      }),
+    );
   });
 
   it('persists WeChat thread state when the reply handler returns Agent metadata', async () => {
@@ -248,8 +298,13 @@ describe('agent channel routes', () => {
 
     expect(result).toEqual({ bridged: true, replied: true });
     expect(updateOne).toHaveBeenCalledWith({ _id: 'provider-123' }, expect.any(Object));
-    const patch = updateOne.mock.calls[0][1].$set;
-    const [threadPath] = Object.keys(patch);
+    const threadUpdate = updateOne.mock.calls.find(([_, update]) =>
+      Object.keys(update.$set ?? {}).some((key) => key.startsWith('settings.wechatThreads.')),
+    );
+    const patch = threadUpdate[1].$set;
+    const [threadPath] = Object.keys(patch).filter((key) =>
+      key.startsWith('settings.wechatThreads.'),
+    );
     expect(threadPath).toMatch(/^settings\.wechatThreads\./);
     expect(patch[threadPath]).toEqual(
       expect.objectContaining({

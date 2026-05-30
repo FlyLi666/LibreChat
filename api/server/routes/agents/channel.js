@@ -225,6 +225,20 @@ async function updateProviderRuntime(providerId, value) {
   await AgentChannelProvider.updateOne({ _id: providerId }, { $set: value });
 }
 
+async function drainWechatBacklog(providerId, cursor) {
+  await AgentChannelProvider.updateOne(
+    { _id: providerId },
+    {
+      $set: {
+        cursor,
+        lastError: undefined,
+        runtimeStatus: 'connected',
+        'settings.skipNextWechatBacklog': false,
+      },
+    },
+  );
+}
+
 function getWechatMessageSender(message) {
   return message?.from_user_id || message?.sender_id || message?.fromUserId || '';
 }
@@ -269,6 +283,25 @@ function getWechatThreadState(provider, fromUserId) {
     key,
     state: provider.settings?.wechatThreads?.[key] || {},
   };
+}
+
+function getWechatMessageKey(contextToken) {
+  return Buffer.from(contextToken).toString('base64url');
+}
+
+async function markWechatMessageProcessed(provider, messageKey, value) {
+  provider.settings = provider.settings || {};
+  provider.settings.processedWechatMessages = provider.settings.processedWechatMessages || {};
+  provider.settings.processedWechatMessages[messageKey] = value;
+
+  await AgentChannelProvider.updateOne(
+    { _id: provider._id },
+    {
+      $set: {
+        [`settings.processedWechatMessages.${messageKey}`]: value,
+      },
+    },
+  );
 }
 
 async function updateWechatThreadState(providerId, key, value) {
@@ -324,6 +357,11 @@ async function handleWechatInboundMessage({ provider, credentials, message }) {
     return { skipped: true };
   }
 
+  const messageKey = getWechatMessageKey(contextToken);
+  if (provider.settings?.processedWechatMessages?.[messageKey]) {
+    return { duplicate: true, skipped: true };
+  }
+
   /**
    * This is the narrow integration point for the next Agent bridge slice.
    * Lobe routes this through BotMessageRouter -> AgentBridgeService -> BotCallbackService.
@@ -357,6 +395,11 @@ async function handleWechatInboundMessage({ provider, credentials, message }) {
   }
 
   await sendWechatText(credentials, fromUserId, replyText, contextToken);
+  await markWechatMessageProcessed(provider, messageKey, {
+    contextToken,
+    fromUserId,
+    processedAt: new Date(),
+  });
   if (replyResult && typeof replyResult === 'object') {
     await updateWechatThreadState(provider._id, threadKey, {
       conversationId: replyResult.conversationId,
@@ -415,6 +458,12 @@ function startWechatRuntime(provider, credentials) {
         };
         if (messages.length > 0) {
           runtimePatch.lastMessageAt = new Date();
+          if (provider.settings?.skipNextWechatBacklog) {
+            provider.settings.skipNextWechatBacklog = false;
+            await drainWechatBacklog(providerId, cursor);
+            continue;
+          }
+
           for (const message of messages) {
             try {
               await handleWechatInboundMessage({ provider, credentials, message });
@@ -672,11 +721,14 @@ module.exports = router;
 
 router._internals = {
   AgentChannelProvider,
+  drainWechatBacklog,
   extractWechatMessageText,
   getWechatContextToken,
   getWechatMessageSender,
+  getWechatMessageKey,
   getWechatThreadKey,
   handleWechatInboundMessage,
+  markWechatMessageProcessed,
   normalizeWechatSettings,
   resolveChannelAgent,
   scheduleWechatRuntimeRestore,
