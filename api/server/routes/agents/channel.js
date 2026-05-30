@@ -456,14 +456,15 @@ function startWechatRuntime(provider, credentials) {
           lastError: undefined,
           runtimeStatus: 'connected',
         };
-        if (messages.length > 0) {
-          runtimePatch.lastMessageAt = new Date();
-          if (provider.settings?.skipNextWechatBacklog) {
-            provider.settings.skipNextWechatBacklog = false;
-            await drainWechatBacklog(providerId, cursor);
+        if (provider.settings?.skipNextWechatBacklog) {
+          provider.settings.skipNextWechatBacklog = false;
+          await drainWechatBacklog(providerId, cursor);
+          if (messages.length > 0) {
             continue;
           }
-
+        }
+        if (messages.length > 0) {
+          runtimePatch.lastMessageAt = new Date();
           for (const message of messages) {
             try {
               await handleWechatInboundMessage({ provider, credentials, message });
