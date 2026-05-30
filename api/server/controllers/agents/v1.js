@@ -53,6 +53,9 @@ const systemTools = {
   [Tools.web_search]: true,
 };
 
+const HEZI_DEFAULT_PROVIDER = 'HeZi newAPI';
+const HEZI_DEFAULT_MODEL = 'gpt-5.5';
+
 const MAX_SEARCH_LEN = 100;
 const escapeRegex = (str = '') => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const getSafeModelParameters = (modelParameters) => {
@@ -60,6 +63,24 @@ const getSafeModelParameters = (modelParameters) => {
   return typeof useResponsesApi === 'boolean' ? { useResponsesApi } : {};
 };
 const hasEditBit = (permission) => (permission & PermissionBits.EDIT) === PermissionBits.EDIT;
+
+const normalizeHeziAgentEndpoint = (agentData, existingAgent) => {
+  if (!agentData || typeof agentData !== 'object') return agentData;
+
+  if (!agentData.provider) {
+    if (!existingAgent || existingAgent.provider === EModelEndpoint.openAI) {
+      agentData.provider = HEZI_DEFAULT_PROVIDER;
+    }
+  } else if (agentData.provider === EModelEndpoint.openAI) {
+    agentData.provider = HEZI_DEFAULT_PROVIDER;
+  }
+
+  if (!agentData.model) {
+    agentData.model = existingAgent?.model || HEZI_DEFAULT_MODEL;
+  }
+
+  return agentData;
+};
 
 const sanitizeViewerSkillScope = (agent, accessibleSkillSet) => {
   const skillScopeEnabled = agent.skills_enabled === true;
@@ -320,6 +341,7 @@ const createAgentHandler = async (req, res) => {
     if (agentData.model_parameters && typeof agentData.model_parameters === 'object') {
       agentData.model_parameters = removeNullishValues(agentData.model_parameters, true);
     }
+    normalizeHeziAgentEndpoint(agentData);
 
     const { id: userId, role: userRole } = req.user;
 
@@ -593,6 +615,7 @@ const updateAgentHandler = async (req, res) => {
     if (!existingAgent) {
       return res.status(404).json({ error: 'Agent not found' });
     }
+    normalizeHeziAgentEndpoint(updateData, existingAgent);
 
     // Convert legacy OCR tool resource to context format in existing agent
     const ocrConversion = mergeAgentOcrConversion(existingAgent, updateData);

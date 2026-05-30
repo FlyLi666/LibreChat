@@ -27,6 +27,9 @@ const WECHAT_DEFAULT_SETTINGS = {
   showUsage: false,
 };
 const WECHAT_CONCURRENCY_MODES = new Set(['queue', 'parallel', 'latest']);
+const FALLBACK_AGENT_NAME = 'Lobe AI';
+const VIRTUAL_LOBE_AGENT_IDS = new Set(['lobe-ai']);
+const LOBE_STYLE_AGENT_ID_PATTERN = /^agt[_-]/i;
 
 const agentChannelProviderSchema = new mongoose.Schema(
   {
@@ -134,15 +137,41 @@ function normalizeWechatSettings(settings = {}) {
   };
 }
 
-async function requireChannelAgent(req, res) {
-  const agent = await db.getAgent({ id: req.params.agentId });
+function isVirtualLobeAgentId(agentId) {
+  return VIRTUAL_LOBE_AGENT_IDS.has(agentId) || LOBE_STYLE_AGENT_ID_PATTERN.test(agentId);
+}
 
-  if (!agent) {
-    res.status(404).json({ error: 'Agent not found for channel binding' });
-    return null;
+async function resolveChannelAgent(req, res, user) {
+  const routeAgentId = req.params.agentId;
+  const directAgent = await db.getAgent({ id: routeAgentId });
+
+  if (directAgent) {
+    return { agent: directAgent, agentId: directAgent.id || routeAgentId };
   }
 
-  return agent;
+  if (isVirtualLobeAgentId(routeAgentId)) {
+    const existingProvider = user
+      ? await AgentChannelProvider.findOne({
+          enabled: true,
+          platform: 'wechat',
+          user,
+        }).lean()
+      : null;
+    if (existingProvider?.agentId) {
+      const providerAgent = await db.getAgent({ id: existingProvider.agentId });
+      if (providerAgent) {
+        return { agent: providerAgent, agentId: providerAgent.id || existingProvider.agentId };
+      }
+    }
+
+    const fallbackAgent = await db.getAgent({ name: FALLBACK_AGENT_NAME });
+    if (fallbackAgent) {
+      return { agent: fallbackAgent, agentId: fallbackAgent.id };
+    }
+  }
+
+  res.status(404).json({ error: 'Agent not found for channel binding' });
+  return null;
 }
 
 async function encryptCredentials(credentials) {
@@ -482,11 +511,11 @@ router.get('/wechat/qrcode/:qrcode/status', async (req, res, next) => {
 router.get('/:agentId/wechat', async (req, res, next) => {
   try {
     const user = getUserId(req);
-    const agent = await requireChannelAgent(req, res);
-    if (!agent) return undefined;
+    const resolved = await resolveChannelAgent(req, res, user);
+    if (!resolved) return undefined;
 
     const provider = await AgentChannelProvider.findOne({
-      agentId: req.params.agentId,
+      agentId: resolved.agentId,
       platform: 'wechat',
       user,
     }).lean();
@@ -515,8 +544,8 @@ router.post('/:agentId/wechat/connect', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const agent = await requireChannelAgent(req, res);
-    if (!agent) return undefined;
+    const resolved = await resolveChannelAgent(req, res, user);
+    if (!resolved) return undefined;
 
     if (!credentials.botToken || !credentials.botId || !credentials.userId) {
       return res.status(400).json({ error: 'Missing WeChat bot credentials' });
@@ -524,10 +553,10 @@ router.post('/:agentId/wechat/connect', async (req, res, next) => {
 
     const encryptedCredentials = await encryptCredentials(credentials);
     const provider = await AgentChannelProvider.findOneAndUpdate(
-      { agentId: req.params.agentId, platform: 'wechat', user },
+      { agentId: resolved.agentId, platform: 'wechat', user },
       {
         $set: {
-          agentId: req.params.agentId,
+          agentId: resolved.agentId,
           applicationId: credentials.botId,
           connectedAt: new Date(),
           credentials: encryptedCredentials,
@@ -560,11 +589,11 @@ router.post('/:agentId/wechat/settings', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const agent = await requireChannelAgent(req, res);
-    if (!agent) return undefined;
+    const resolved = await resolveChannelAgent(req, res, user);
+    if (!resolved) return undefined;
 
     const provider = await AgentChannelProvider.findOne({
-      agentId: req.params.agentId,
+      agentId: resolved.agentId,
       enabled: true,
       platform: 'wechat',
       user,
@@ -586,11 +615,11 @@ router.post('/:agentId/wechat/settings', async (req, res, next) => {
 router.post('/:agentId/wechat/start', async (req, res, next) => {
   try {
     const user = getUserId(req);
-    const agent = await requireChannelAgent(req, res);
-    if (!agent) return undefined;
+    const resolved = await resolveChannelAgent(req, res, user);
+    if (!resolved) return undefined;
 
     const provider = await AgentChannelProvider.findOne({
-      agentId: req.params.agentId,
+      agentId: resolved.agentId,
       enabled: true,
       platform: 'wechat',
       user,
@@ -615,11 +644,11 @@ router.post('/:agentId/wechat/start', async (req, res, next) => {
 router.post('/:agentId/wechat/disconnect', async (req, res, next) => {
   try {
     const user = getUserId(req);
-    const agent = await requireChannelAgent(req, res);
-    if (!agent) return undefined;
+    const resolved = await resolveChannelAgent(req, res, user);
+    if (!resolved) return undefined;
 
     const provider = await AgentChannelProvider.findOne({
-      agentId: req.params.agentId,
+      agentId: resolved.agentId,
       platform: 'wechat',
       user,
     });
@@ -649,6 +678,7 @@ router._internals = {
   getWechatThreadKey,
   handleWechatInboundMessage,
   normalizeWechatSettings,
+  resolveChannelAgent,
   scheduleWechatRuntimeRestore,
   sendWechatText,
 };

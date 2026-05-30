@@ -15,7 +15,7 @@ export type ResolvedAgentRouteContext = {
 };
 
 const FALLBACK_AGENT_NAME = 'Lobe AI';
-const AGENT_ID_PATTERN = /^ag(?:en)?t[_-]/i;
+const AGENT_ID_PATTERN = /^agent[_-]/i;
 const LOBE_STYLE_AGENT_ID_PATTERN = /^agt[_-]/i;
 
 function normalizeAgentToken(value: string | null | undefined) {

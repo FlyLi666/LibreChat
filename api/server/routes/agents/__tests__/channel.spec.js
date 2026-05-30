@@ -84,12 +84,39 @@ describe('agent channel routes', () => {
     );
   });
 
-  it('rejects WeChat provider binding when the route id is not a real Agent', async () => {
-    mockGetAgent.mockResolvedValueOnce(null);
+  it('resolves Lobe-style virtual ids to the connected real Agent provider', async () => {
+    const provider = {
+      _id: { toString: () => 'provider-123' },
+      agentId: 'agent-real-id',
+      applicationId: 'bot-id-123',
+      enabled: true,
+      platform: 'wechat',
+      runtimeStatus: 'connected',
+      settings: {},
+      user: 'user-123',
+    };
+    const findOne = jest
+      .spyOn(channelRouter._internals.AgentChannelProvider, 'findOne')
+      .mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValue(provider),
+      })
+      .mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValue(provider),
+      });
+    mockGetAgent
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'agent-real-id', user: 'user-123' });
 
-    await request(app).get('/api/agents/channel/lobe-ai/wechat').expect(404);
+    const response = await request(app).get('/api/agents/channel/lobe-ai/wechat').expect(200);
 
+    expect(response.body).toEqual(expect.objectContaining({ agentId: 'agent-real-id' }));
     expect(mockGetAgent).toHaveBeenCalledWith({ id: 'lobe-ai' });
+    expect(mockGetAgent).toHaveBeenCalledWith({ id: 'agent-real-id' });
+    expect(findOne).toHaveBeenLastCalledWith({
+      agentId: 'agent-real-id',
+      platform: 'wechat',
+      user: 'user-123',
+    });
   });
 
   it('extracts text from WeChat message items', () => {

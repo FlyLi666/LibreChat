@@ -22,6 +22,7 @@ You are Lobe AI, a focused assistant for product thinking, coding plans, and car
 - Prefer small, verifiable steps.`;
 
 const defaultSkills = ['Search', 'Code', 'Image', 'Notebook'];
+const HEZI_DEFAULT_PROVIDER = 'HeZi newAPI';
 const modelOptions = ['gpt-5.5', 'gpt-5.1', 'claude-opus-4.7', 'gemini-3.5-flash'];
 
 const skillToolMap: Record<string, string> = {
@@ -182,7 +183,7 @@ export default function AgentProfilePage({
         const createdAgent = await createAgent.mutateAsync({
           ...payload,
           model_parameters: {},
-          provider: 'openAI',
+          provider: HEZI_DEFAULT_PROVIDER,
         });
         navigate(`/agent/${createdAgent.id}/profile`, { replace: true });
       }

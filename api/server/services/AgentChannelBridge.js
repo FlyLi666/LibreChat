@@ -68,6 +68,24 @@ function extractReplyText(responseMessage) {
   return '';
 }
 
+async function resolveReplyText(responseMessage, userId) {
+  const replyText = extractReplyText(responseMessage);
+  if (replyText || !responseMessage?.messageId || !userId) {
+    return replyText;
+  }
+
+  try {
+    const persistedMessage = await db.getMessage({
+      messageId: responseMessage.messageId,
+      user: userId,
+    });
+    return extractReplyText(persistedMessage);
+  } catch (error) {
+    logger?.warn?.('[AgentChannelBridge] Failed to load persisted reply text', error);
+    return '';
+  }
+}
+
 async function withTimeout(promise, timeoutMs) {
   let timer;
   try {
@@ -166,7 +184,7 @@ async function runAgentReply({
     const databasePromise = response.databasePromise;
     delete response.databasePromise;
     const { conversation } = databasePromise ? await databasePromise : {};
-    const replyText = extractReplyText(response);
+    const replyText = await resolveReplyText(response, user.id);
 
     return {
       conversationId:
@@ -211,5 +229,6 @@ function createWechatReplyHandler(options = {}) {
 module.exports = {
   createWechatReplyHandler,
   extractReplyText,
+  resolveReplyText,
   runAgentReply,
 };

@@ -2,6 +2,7 @@ const mockBuildOptions = jest.fn();
 const mockInitializeClient = jest.fn();
 const mockDisposeClient = jest.fn();
 const mockGetAppConfig = jest.fn();
+const mockGetMessage = jest.fn();
 const mockGetUserById = jest.fn();
 
 jest.mock('~/server/services/Endpoints/agents', () => ({
@@ -18,6 +19,7 @@ jest.mock('~/server/services/Config', () => ({
 }));
 
 jest.mock('~/models', () => ({
+  getMessage: (...args) => mockGetMessage(...args),
   getUserById: (...args) => mockGetUserById(...args),
 }));
 
@@ -38,6 +40,7 @@ describe('AgentChannelBridge', () => {
       endpoint: 'agents',
       model_parameters: {},
     });
+    mockGetMessage.mockReset();
   });
 
   it('runs an Agent reply as the channel owner and extracts text content', async () => {
@@ -102,5 +105,41 @@ describe('AgentChannelBridge', () => {
       userMessageId: 'user-message-1',
     });
     expect(mockDisposeClient).toHaveBeenCalledWith(client);
+  });
+
+  it('falls back to the persisted assistant message when the streaming response has no text', async () => {
+    const sendMessage = jest.fn(async (_text, options) => {
+      options.onStart({ messageId: 'user-message-1' }, 'agent-message-1');
+      return {
+        conversationId: options.conversationId,
+        databasePromise: Promise.resolve({
+          conversation: { conversationId: options.conversationId },
+        }),
+        messageId: 'agent-message-1',
+        text: '',
+      };
+    });
+    const client = { sendMessage };
+    mockInitializeClient.mockResolvedValue({ client, userMCPAuthMap: { server: {} } });
+    mockGetMessage.mockResolvedValue({
+      content: [{ text: { value: 'persisted agent reply' }, type: 'text' }],
+      messageId: 'agent-message-1',
+      text: '',
+    });
+
+    const { runAgentReply } = require('../AgentChannelBridge');
+    const result = await runAgentReply({
+      agentId: 'agent-123',
+      conversationId: 'conversation-123',
+      ownerUserId: 'user-123',
+      text: 'wechat says hi',
+      timeoutMs: 1000,
+    });
+
+    expect(mockGetMessage).toHaveBeenCalledWith({
+      messageId: 'agent-message-1',
+      user: 'user-123',
+    });
+    expect(result.replyText).toBe('persisted agent reply');
   });
 });

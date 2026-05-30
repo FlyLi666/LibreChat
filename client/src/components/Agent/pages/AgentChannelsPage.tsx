@@ -79,7 +79,6 @@ type WechatSettings = {
   showUsage: boolean;
 };
 
-const REAL_AGENT_ID_PATTERN = /^ag(?:en)?t[_-]/i;
 const DEFAULT_WECHAT_SETTINGS: WechatSettings = {
   characterLimit: 2000,
   concurrencyMode: 'queue',
@@ -415,8 +414,7 @@ export default function AgentChannelsPage({
 }) {
   const localize = useLocalize();
   const wechatPollTimer = useRef<number | null>(null);
-  const channelAgentId =
-    agentContext?.resolvedAgentId ?? (REAL_AGENT_ID_PATTERN.test(agentId) ? agentId : '');
+  const channelAgentId = agentContext?.resolvedAgentId ?? (agentId.trim() ? agentId.trim() : '');
   const [selectedId, setSelectedId] = useState<ChannelConfig['id']>('wechat');
   const [values, setValues] = useState(buildInitialValues);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -765,7 +763,7 @@ export default function AgentChannelsPage({
                   {localize(`com_agent_channel_${selectedChannel.id}`)}
                 </h1>
                 <span className="rounded-full border border-border-light px-2 py-0.5 text-xs text-text-tertiary">
-                  {channelAgentId || agentId}
+                  {wechatProvider?.agentId || channelAgentId || agentId}
                 </span>
               </div>
               <p className="mt-2 text-sm text-text-tertiary">
@@ -859,15 +857,17 @@ export default function AgentChannelsPage({
                   </div>
                 </div>
               ) : null}
-              <button
-                type="button"
-                onClick={startWechatQrFlow}
-                disabled={!channelAgentId}
-                className="inline-flex h-12 items-center gap-3 rounded-lg bg-surface-submit px-5 text-sm font-semibold text-white transition-colors hover:bg-surface-submit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <QrCode className="size-5" aria-hidden="true" />
-                {localize('com_agent_channel_scan_connect')}
-              </button>
+              {!wechatProvider ? (
+                <button
+                  type="button"
+                  onClick={startWechatQrFlow}
+                  disabled={!channelAgentId}
+                  className="inline-flex h-12 items-center gap-3 rounded-lg bg-surface-submit px-5 text-sm font-semibold text-white transition-colors hover:bg-surface-submit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <QrCode className="size-5" aria-hidden="true" />
+                  {localize('com_agent_channel_scan_connect')}
+                </button>
+              ) : null}
               <p className="mt-5 max-w-xl text-sm leading-6 text-text-tertiary">
                 {localize('com_agent_channel_wechat_scan_hint')}
               </p>
