@@ -85,7 +85,7 @@ function ChatView({ index = 0 }: { index?: number }) {
       <ChatContext.Provider value={chatHelpers}>
         <AddedChatContext.Provider value={addedChatHelpers}>
           <Presentation>
-            <div className="relative flex h-full w-full flex-col overflow-hidden">
+            <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden">
               <Header />
               {isLandingPage ? (
                 <>
@@ -102,10 +102,10 @@ function ChatView({ index = 0 }: { index?: number }) {
                 </>
               ) : (
                 <>
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden transition-colors duration-200">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain transition-colors duration-200">
                     {content}
                   </div>
-                  <div className="shrink-0 bg-surface-primary px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+                  <div className="z-10 shrink-0 bg-surface-primary px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
                     <ChatForm index={index} />
                     <Footer />
                   </div>

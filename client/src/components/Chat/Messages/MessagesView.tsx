@@ -37,8 +37,8 @@ function MessagesViewContent({
 
   return (
     <>
-      <div className="relative flex-1 overflow-hidden overflow-y-auto">
-        <div className="relative h-full">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="relative h-full min-h-0">
           <div
             className="scrollbar-gutter-stable"
             onScroll={debouncedHandleScroll}

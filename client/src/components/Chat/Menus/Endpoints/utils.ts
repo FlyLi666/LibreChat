@@ -11,6 +11,69 @@ import type { useLocalize } from '~/hooks';
 import SpecIcon from '~/components/Chat/Menus/Endpoints/components/SpecIcon';
 import { Endpoint, SelectedValues } from '~/common';
 
+export type ChatModelProvider = 'GPT' | 'Claude' | 'Gemini';
+
+export const chatModelProviderOrder: ChatModelProvider[] = ['GPT', 'Claude', 'Gemini'];
+
+const nonChatModelPattern =
+  /(image|imagen|dall[-_ ]?e|gpt[-_ ]?image|vision|agent|codex|review|kiro)/i;
+
+export function getChatModelProvider(modelName: string): ChatModelProvider | null {
+  const lowerModel = modelName.toLowerCase();
+
+  if (lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
+    return 'Claude';
+  }
+  if (lowerModel.includes('gemini') || lowerModel.includes('google')) {
+    return 'Gemini';
+  }
+  if (
+    lowerModel.includes('gpt') ||
+    lowerModel.includes('openai') ||
+    /^o[1345](?:[-_.]|$)/i.test(modelName)
+  ) {
+    return 'GPT';
+  }
+
+  return null;
+}
+
+export function isSelectableChatModel(modelName: string): boolean {
+  return getChatModelProvider(modelName) != null && !nonChatModelPattern.test(modelName);
+}
+
+function titleCaseWords(value: string) {
+  return value
+    .split(/[-_\s/]+/)
+    .filter(Boolean)
+    .map((part) => {
+      if (/^\d/.test(part)) {
+        return part;
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(' ');
+}
+
+export function formatChatModelName(modelName: string): string {
+  const trimmed = modelName.trim();
+  const provider = getChatModelProvider(trimmed);
+
+  if (provider === 'GPT') {
+    return trimmed.replace(/^gpt/i, 'GPT').replace(/^openai[-_/]/i, '');
+  }
+
+  if (provider === 'Claude') {
+    return titleCaseWords(trimmed.replace(/^anthropic[-_/]/i, ''));
+  }
+
+  if (provider === 'Gemini') {
+    return titleCaseWords(trimmed.replace(/^google[-_/]/i, ''));
+  }
+
+  return trimmed;
+}
+
 export function filterItems<
   T extends {
     label: string;
