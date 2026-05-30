@@ -31,30 +31,34 @@ function Balance() {
     refillIntervalUnit !== undefined &&
     refillIntervalValue !== undefined;
 
+  let autoRefillContent = (
+    <div className="text-sm text-text-secondary">
+      {localize('com_nav_balance_auto_refill_disabled')}
+    </div>
+  );
+
+  if (autoRefillEnabled && hasValidRefillSettings) {
+    autoRefillContent = (
+      <AutoRefillSettings
+        lastRefill={lastRefill}
+        refillAmount={refillAmount}
+        refillIntervalUnit={refillIntervalUnit}
+        refillIntervalValue={refillIntervalValue}
+      />
+    );
+  } else if (autoRefillEnabled) {
+    autoRefillContent = (
+      <div className="text-sm text-red-600">{localize('com_nav_balance_auto_refill_error')}</div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4 text-sm text-text-primary">
       {/* Token credits display */}
       <TokenCreditsItem tokenCredits={tokenCredits} />
 
       {/* Auto-refill display */}
-      {autoRefillEnabled ? (
-        hasValidRefillSettings ? (
-          <AutoRefillSettings
-            lastRefill={lastRefill}
-            refillAmount={refillAmount}
-            refillIntervalUnit={refillIntervalUnit}
-            refillIntervalValue={refillIntervalValue}
-          />
-        ) : (
-          <div className="text-sm text-red-600">
-            {localize('com_nav_balance_auto_refill_error')}
-          </div>
-        )
-      ) : (
-        <div className="text-sm text-gray-600">
-          {localize('com_nav_balance_auto_refill_disabled')}
-        </div>
-      )}
+      {autoRefillContent}
     </div>
   );
 }

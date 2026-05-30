@@ -358,7 +358,7 @@ function TopicSidebar({
       <Button
         size="icon"
         variant="ghost"
-        className="size-7 rounded-lg bg-white/90 shadow-sm"
+        className="bg-surface-primary/90 size-7 rounded-lg shadow-sm"
         aria-label={localize('com_ui_rename')}
         disabled={renaming || editingTopicId === topic._id}
         onClick={(event) => {
@@ -371,7 +371,7 @@ function TopicSidebar({
       <Button
         size="icon"
         variant="ghost"
-        className="size-7 rounded-lg bg-white/90 shadow-sm"
+        className="bg-surface-primary/90 size-7 rounded-lg shadow-sm"
         aria-label={localize('com_image_action_delete')}
         disabled={deleting}
         onClick={(event) => {
@@ -393,7 +393,7 @@ function TopicSidebar({
         <div key={topic._id} className="group">
           {isEditing ? (
             <input
-              className="h-10 w-full rounded-lg border border-border-medium bg-white px-3 text-sm font-medium text-text-primary outline-none"
+              className="h-10 w-full rounded-lg border border-border-medium bg-surface-primary px-3 text-sm font-medium text-text-primary outline-none"
               value={editingTitle}
               onBlur={() => void saveRename(topic)}
               onChange={(event) => setEditingTitle(event.target.value)}
@@ -411,8 +411,8 @@ function TopicSidebar({
               className={cn(
                 'flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-white text-text-primary shadow-sm ring-1 ring-border-medium'
-                  : 'text-text-secondary hover:bg-white hover:text-text-primary',
+                  ? 'bg-surface-active-alt text-text-primary shadow-sm ring-1 ring-border-medium'
+                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
               )}
             >
               <button
@@ -422,7 +422,7 @@ function TopicSidebar({
               >
                 <span
                   aria-hidden="true"
-                  className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#e9e9ea] text-xs text-text-primary"
+                  className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-tertiary text-xs text-text-primary"
                 >
                   {renderTopicThumb(topic)}
                 </span>
@@ -439,7 +439,7 @@ function TopicSidebar({
       <div key={topic._id} className="group relative">
         {isEditing ? (
           <input
-            className="aspect-square w-full rounded-lg border border-border-medium bg-white px-2 text-center text-sm font-medium text-text-primary outline-none"
+            className="aspect-square w-full rounded-lg border border-border-medium bg-surface-primary px-2 text-center text-sm font-medium text-text-primary outline-none"
             value={editingTitle}
             onBlur={() => void saveRename(topic)}
             onChange={(event) => setEditingTitle(event.target.value)}
@@ -457,8 +457,8 @@ function TopicSidebar({
             className={cn(
               'flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border text-center text-2xl font-semibold transition-all',
               isActive
-                ? 'border-white bg-white text-text-primary shadow-sm ring-2 ring-black'
-                : 'border-transparent bg-[#e9e9ea] text-black hover:bg-white hover:shadow-sm',
+                ? 'border-border-light bg-surface-active-alt text-text-primary shadow-sm ring-2 ring-border-heavy'
+                : 'border-transparent bg-surface-tertiary text-text-primary hover:bg-surface-hover hover:shadow-sm',
             )}
             aria-label={topic.title || untitledLabel}
             onClick={() => selectTopic(topic._id)}
@@ -486,7 +486,7 @@ function TopicSidebar({
 
     return (
       <button
-        className="flex h-16 w-full items-center justify-center rounded-xl border border-dashed border-border-light bg-white/60 text-sm font-medium text-text-tertiary"
+        className="bg-surface-primary/60 flex h-16 w-full items-center justify-center rounded-xl border border-dashed border-border-light text-sm font-medium text-text-tertiary"
         onClick={createTopic}
       >
         {localize('com_image_create_topic')}
@@ -497,15 +497,15 @@ function TopicSidebar({
   const renderTopics = () => (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
       <button
-        className="flex h-10 items-center gap-3 rounded-lg px-2 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-white hover:text-text-primary"
+        className="flex h-10 items-center gap-3 rounded-lg px-2 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
         onClick={createTopic}
       >
-        <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-white text-text-primary">
+        <span className="flex size-6 items-center justify-center rounded-md border border-border-light bg-surface-primary text-text-primary">
           <Plus className="h-4 w-4" />
         </span>
         <span>{localize('com_image_new_topic')}</span>
       </button>
-      <label className="flex h-11 items-center gap-3 rounded-xl bg-[#f0f0f1] px-3 text-[15px] text-text-tertiary">
+      <label className="flex h-11 items-center gap-3 rounded-xl bg-surface-tertiary px-3 text-[15px] text-text-tertiary">
         <Search className="h-5 w-5" />
         <input
           className="min-w-0 flex-1 bg-transparent text-text-primary outline-none placeholder:text-text-tertiary"
@@ -530,14 +530,17 @@ function TopicSidebar({
             />
           </button>
           <div
-            className="flex rounded-lg bg-[#f0f0f1] p-0.5"
+            className="flex rounded-lg bg-surface-tertiary p-0.5"
             role="group"
             aria-label={localize('com_image_topic_view')}
           >
             <Button
               size="icon"
               variant="ghost"
-              className={cn('size-8 rounded-md', viewMode === 'list' && 'bg-white shadow-sm')}
+              className={cn(
+                'size-8 rounded-md',
+                viewMode === 'list' && 'bg-surface-primary shadow-sm',
+              )}
               aria-label={localize('com_image_topic_view_list')}
               aria-pressed={viewMode === 'list'}
               onClick={() => onViewModeChange('list')}
@@ -547,7 +550,10 @@ function TopicSidebar({
             <Button
               size="icon"
               variant="ghost"
-              className={cn('size-8 rounded-md', viewMode === 'grid' && 'bg-white shadow-sm')}
+              className={cn(
+                'size-8 rounded-md',
+                viewMode === 'grid' && 'bg-surface-primary shadow-sm',
+              )}
               aria-label={localize('com_image_topic_view_grid')}
               aria-pressed={viewMode === 'grid'}
               onClick={() => onViewModeChange('grid')}
@@ -563,7 +569,7 @@ function TopicSidebar({
 
   return (
     <>
-      <aside className="hidden w-[288px] shrink-0 border-r border-border-light bg-[#f7f7f8] text-text-primary lg:flex lg:flex-col">
+      <aside className="hidden w-[288px] shrink-0 border-r border-border-light bg-surface-secondary text-text-primary lg:flex lg:flex-col">
         {renderHeader()}
         {renderTopics()}
       </aside>
@@ -578,7 +584,7 @@ function TopicSidebar({
           </div>
           <aside
             data-testid="image-topic-drawer"
-            className="fixed left-0 top-0 z-[106] flex h-dvh w-[min(88vw,390px)] flex-col border-r border-border-light bg-[#f7f7f8] text-text-primary shadow-2xl lg:hidden"
+            className="fixed left-0 top-0 z-[106] flex h-dvh w-[min(88vw,390px)] flex-col border-r border-border-light bg-surface-secondary text-text-primary shadow-2xl lg:hidden"
             aria-label={localize('com_image_topics')}
           >
             {renderHeader(true)}
@@ -644,13 +650,13 @@ function GenerationCard({
           return (
             <div
               key={generation._id}
-              className="relative aspect-square overflow-hidden rounded-xl bg-[#f6f6f6]"
+              className="relative aspect-square overflow-hidden rounded-xl bg-surface-tertiary"
               onMouseEnter={() => setHoveredGenerationId(generation._id)}
               onMouseLeave={() => setHoveredGenerationId(null)}
             >
               <div
                 className={cn(
-                  'absolute right-2 top-2 z-10 flex gap-1 rounded-lg bg-white/90 p-1 opacity-100 shadow-sm backdrop-blur transition-opacity md:opacity-0',
+                  'bg-surface-primary/90 absolute right-2 top-2 z-10 flex gap-1 rounded-lg p-1 opacity-100 shadow-sm backdrop-blur transition-opacity md:opacity-0',
                   hoveredGenerationId === generation._id && 'md:opacity-100',
                 )}
               >
@@ -734,7 +740,7 @@ function GenerationCard({
           batchHovered && 'md:opacity-100',
         )}
       >
-        <div className="flex rounded-xl bg-[#f7f7f7] p-1">
+        <div className="flex rounded-xl bg-surface-tertiary p-1">
           <Button
             size="icon"
             variant="ghost"
@@ -825,10 +831,10 @@ function PromptComposer({
   const disabled = !prompt.trim() || generating || uploading;
 
   return (
-    <div className="mx-auto w-full max-w-[1050px] rounded-2xl border border-border-light bg-white p-2 shadow-[0_8px_28px_rgba(0,0,0,0.06)]">
+    <div className="mx-auto w-full max-w-[1050px] rounded-2xl border border-border-light bg-surface-primary p-2 shadow-[0_8px_28px_rgba(0,0,0,0.06)]">
       <div className="flex min-h-[104px] gap-3 p-1">
         {supportsReferenceImage ? (
-          <label className="flex size-[88px] shrink-0 cursor-pointer items-center justify-center rounded-xl bg-[#f5f5f5] text-text-tertiary transition-colors hover:bg-surface-hover">
+          <label className="flex size-16 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-surface-tertiary text-text-tertiary transition-colors hover:bg-surface-hover sm:size-[88px]">
             {referenceFile ? (
               <span className="line-clamp-3 px-2 text-center text-xs text-text-secondary">
                 {referenceFile.name}
@@ -864,7 +870,7 @@ function PromptComposer({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-border-light px-1 py-2">
-        <div className="flex h-10 items-center gap-2 rounded-xl bg-[#f6f6f7] px-3 text-sm font-medium text-text-primary">
+        <div className="flex h-10 items-center gap-2 rounded-xl bg-surface-tertiary px-3 text-sm font-medium text-text-primary">
           <ImageIcon className="h-4 w-4" />
           <span>{localize('com_image_mode_image')}</span>
           <ChevronDown className="h-4 w-4 text-text-tertiary" />
@@ -875,7 +881,7 @@ function PromptComposer({
         <select
           id="hezi-image-model"
           aria-label={localize('com_image_model')}
-          className="h-10 max-w-[220px] rounded-xl border-0 bg-transparent px-2 text-sm text-text-secondary outline-none hover:bg-[#f6f6f7]"
+          className="h-10 max-w-[220px] rounded-xl border-0 bg-transparent px-2 text-sm text-text-secondary outline-none hover:bg-surface-hover"
           value={modelId}
           onChange={(event) => onModelChange(event.target.value)}
         >
@@ -889,14 +895,14 @@ function PromptComposer({
           <Button
             size="icon"
             variant="ghost"
-            className={cn('size-10 rounded-xl', configOpen && 'bg-[#f6f6f7]')}
+            className={cn('size-10 rounded-xl', configOpen && 'bg-surface-hover')}
             aria-label={localize('com_image_parameters')}
             onClick={() => setConfigOpen((open) => !open)}
           >
             <Settings2 className="h-4 w-4" />
           </Button>
           {configOpen && (
-            <div className="absolute bottom-12 left-0 z-20 grid w-72 gap-3 rounded-2xl border border-border-light bg-white p-4 shadow-xl">
+            <div className="absolute bottom-12 left-0 z-20 grid w-72 gap-3 rounded-2xl border border-border-light bg-surface-primary p-4 shadow-xl">
               <div className="text-sm font-semibold text-text-primary">
                 {model?.displayName || localize('com_image_model')}
               </div>
@@ -1269,10 +1275,10 @@ export default function ImagePage() {
 
       return (
         <div className="flex min-h-full items-center justify-center px-4 py-10">
-          <div className="grid w-full max-w-[1100px] gap-20">
-            <div className="flex items-center justify-center gap-3 text-center text-4xl font-semibold text-black md:text-5xl">
+          <div className="grid w-full max-w-[1100px] gap-10 md:gap-20">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-center text-3xl font-semibold text-text-primary sm:gap-3 md:text-5xl">
               <span>{localize('com_image_create_title')}</span>
-              <button className="inline-flex items-center gap-1 rounded-xl px-1 text-black transition-colors hover:bg-surface-hover">
+              <button className="inline-flex items-center gap-1 rounded-xl px-1 text-text-primary transition-colors hover:bg-surface-hover">
                 <span>{localize('com_image_mode_image')}</span>
                 <ChevronDown className="mt-1 h-5 w-5 text-text-secondary" />
               </button>
@@ -1303,7 +1309,7 @@ export default function ImagePage() {
   };
 
   return (
-    <div className="relative flex h-full min-h-0 w-full overflow-hidden bg-[#f7f7f8] text-text-primary">
+    <div className="relative flex h-full min-h-0 w-full overflow-hidden bg-surface-secondary text-text-primary">
       {desktopTopicsOpen ? (
         <TopicSidebar
           topics={topics}
@@ -1325,14 +1331,14 @@ export default function ImagePage() {
         <Button
           size="icon"
           variant="ghost"
-          className="absolute left-3 top-3 z-20 hidden size-9 rounded-xl bg-white/90 text-text-secondary shadow-sm lg:inline-flex"
+          className="bg-surface-primary/90 absolute left-3 top-3 z-20 hidden size-9 rounded-xl text-text-secondary shadow-sm lg:inline-flex"
           aria-label={localize('com_image_open_sidebar')}
           onClick={() => setDesktopTopicsOpen(true)}
         >
           <ImageIcon className="h-4 w-4" />
         </Button>
       ) : null}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f1f1f2]">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-secondary">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border-light bg-surface-primary px-3 md:hidden">
           <OpenSidebar />
           <h1 className="min-w-0 truncate text-sm font-semibold text-text-primary">
@@ -1349,7 +1355,7 @@ export default function ImagePage() {
           </Button>
         </div>
         <div className="min-h-0 flex-1 p-2 md:p-4">
-          <div className="h-full overflow-hidden rounded-[22px] border border-border-light bg-white shadow-sm">
+          <div className="h-full overflow-hidden rounded-[22px] border border-border-light bg-surface-primary shadow-sm">
             {shouldDockComposer ? (
               <div className="flex h-full min-h-0 flex-col">
                 <div data-testid="image-history-scroll" className="min-h-0 flex-1 overflow-y-auto">
@@ -1357,7 +1363,7 @@ export default function ImagePage() {
                 </div>
                 <div
                   data-testid="image-composer-dock"
-                  className="shrink-0 border-t border-border-light bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.04)] md:px-4"
+                  className="bg-surface-primary/95 shrink-0 border-t border-border-light px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,0.04)] md:px-4"
                 >
                   {renderPromptComposer()}
                 </div>

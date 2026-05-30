@@ -81,31 +81,34 @@ export default function AgentTasksPage({
             const Icon = statusIcons[status];
             const isOpen = openGroups[status];
             return (
-              <section key={status} className="rounded-lg border border-white/10 bg-[#171b24]">
+              <section
+                key={status}
+                className="rounded-lg border border-border-light bg-surface-primary-alt"
+              >
                 <button
                   type="button"
                   onClick={() =>
                     setOpenGroups((current) => ({ ...current, [status]: !current[status] }))
                   }
-                  className="hover:bg-white/7 flex h-12 w-full items-center gap-3 px-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30"
+                  className="flex h-12 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
                 >
                   <ChevronDown
                     className={cn(
-                      'text-white/42 size-4 transition-transform',
+                      'size-4 text-text-tertiary transition-transform',
                       !isOpen && '-rotate-90',
                     )}
                     aria-hidden="true"
                   />
-                  <Icon className="size-4 text-sky-200" aria-hidden="true" />
-                  <span className="flex-1 text-sm font-semibold text-white">
+                  <Icon className="size-4 text-sky-700 dark:text-sky-200" aria-hidden="true" />
+                  <span className="flex-1 text-sm font-semibold text-text-primary">
                     {localize(`com_agent_task_${status}`)}
                   </span>
-                  <span className="bg-white/8 text-white/48 rounded-full px-2 py-0.5 text-xs">
+                  <span className="rounded-full bg-surface-hover px-2 py-0.5 text-xs text-text-tertiary">
                     {groupedTasks[status].length}
                   </span>
                 </button>
                 {isOpen ? (
-                  <div className="divide-white/8 divide-y border-t border-white/10">
+                  <div className="divide-y divide-border-light border-t border-border-light">
                     {groupedTasks[status].map((task) => (
                       <button
                         type="button"
@@ -113,17 +116,17 @@ export default function AgentTasksPage({
                         onClick={() => navigate(`/agent/${agentId}/task/${task.id}`)}
                         className={cn(
                           'w-full px-4 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300/50',
-                          task.id === taskId ? 'bg-sky-400/10' : 'hover:bg-white/7',
+                          task.id === taskId ? 'bg-surface-active-alt' : 'hover:bg-surface-hover',
                         )}
                       >
-                        <div className="text-sm font-medium text-white">{task.title}</div>
-                        <div className="text-white/48 mt-1 line-clamp-2 text-xs leading-5">
+                        <div className="text-sm font-medium text-text-primary">{task.title}</div>
+                        <div className="mt-1 line-clamp-2 text-xs leading-5 text-text-tertiary">
                           {task.detail}
                         </div>
                       </button>
                     ))}
                     {groupedTasks[status].length === 0 ? (
-                      <div className="text-white/42 px-4 py-5 text-sm">
+                      <div className="px-4 py-5 text-sm text-text-tertiary">
                         {localize('com_agent_task_empty_group')}
                       </div>
                     ) : null}
@@ -134,29 +137,36 @@ export default function AgentTasksPage({
           })}
         </div>
 
-        <aside className="rounded-lg border border-white/10 bg-[#171b24] p-5">
+        <aside
+          className={cn(
+            'rounded-lg border border-border-light bg-surface-primary-alt p-5',
+            selectedTask && 'order-first lg:order-none',
+          )}
+        >
           {selectedTask ? (
             <div data-testid="agent-task-detail" className="space-y-4">
               <div>
-                <div className="text-white/38 text-xs font-medium uppercase tracking-[0.12em]">
+                <div className="text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary">
                   {localize(`com_agent_task_${selectedTask.status}`)}
                 </div>
-                <h2 className="mt-2 text-lg font-semibold text-white">{selectedTask.title}</h2>
+                <h2 className="mt-2 text-lg font-semibold text-text-primary">
+                  {selectedTask.title}
+                </h2>
               </div>
-              <p className="text-white/58 text-sm leading-6">{selectedTask.detail}</p>
+              <p className="text-sm leading-6 text-text-secondary">{selectedTask.detail}</p>
               <textarea
                 defaultValue={selectedTask.detail}
-                className="hover:border-white/18 min-h-36 w-full resize-y rounded-md border border-white/10 bg-[#10131a] p-3 text-sm leading-6 text-white outline-none transition-colors focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
+                className="min-h-36 w-full resize-y rounded-md border border-border-light bg-surface-primary p-3 text-sm leading-6 text-text-primary outline-none transition-colors hover:border-border-medium focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
                 aria-label={localize('com_agent_task_notes')}
               />
             </div>
           ) : (
             <div className="flex min-h-64 flex-col items-center justify-center text-center">
-              <CircleDot className="text-white/28 size-10" aria-hidden="true" />
-              <h2 className="mt-4 text-base font-semibold text-white">
+              <CircleDot className="size-10 text-text-tertiary" aria-hidden="true" />
+              <h2 className="mt-4 text-base font-semibold text-text-primary">
                 {localize('com_agent_task_no_selection')}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-white/50">
+              <p className="mt-2 text-sm leading-6 text-text-secondary">
                 {localize('com_agent_task_no_selection_subtitle')}
               </p>
             </div>

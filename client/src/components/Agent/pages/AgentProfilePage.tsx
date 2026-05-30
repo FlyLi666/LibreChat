@@ -219,7 +219,9 @@ export default function AgentProfilePage({
             'inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60',
             isSaving && 'cursor-not-allowed opacity-65',
-            saved ? 'bg-emerald-400 text-emerald-950' : 'bg-white text-black hover:bg-white/85',
+            saved
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400 dark:text-emerald-950'
+              : 'bg-surface-submit text-white hover:bg-surface-submit-hover',
           )}
         >
           <Check className="size-4" aria-hidden="true" />
@@ -229,25 +231,25 @@ export default function AgentProfilePage({
     >
       <section className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <div className="rounded-lg border border-white/10 bg-[#171b24] p-5 shadow-2xl shadow-black/20">
-            <div className="mx-auto flex size-40 items-center justify-center rounded-[2rem] bg-gradient-to-br from-emerald-300 via-sky-400 to-violet-500 text-5xl font-semibold text-white shadow-2xl shadow-sky-950/40">
+          <div className="rounded-lg border border-border-light bg-surface-primary-alt p-5 shadow-2xl shadow-black/20">
+            <div className="mx-auto flex size-40 items-center justify-center rounded-[2rem] bg-gradient-to-br from-emerald-300 via-sky-400 to-violet-500 text-5xl font-semibold text-text-primary shadow-2xl shadow-sky-950/40">
               {initials}
             </div>
             <div className="mt-5 text-center">
-              <div className="text-sm font-medium text-white">{name}</div>
-              <div className="text-white/42 mt-1 text-xs">{agentId}</div>
+              <div className="text-sm font-medium text-text-primary">{name}</div>
+              <div className="mt-1 text-xs text-text-tertiary">{agentId}</div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-[#171b24] p-4">
-            <label className="text-white/38 text-xs font-medium uppercase tracking-[0.12em]">
+          <div className="rounded-lg border border-border-light bg-surface-primary-alt p-4">
+            <label className="text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary">
               {localize('com_agent_model')}
             </label>
             <div className="relative mt-2">
               <select
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
-                className="border-white/12 hover:border-white/24 h-11 w-full appearance-none rounded-md border bg-[#10131a] px-3 pr-9 text-sm text-white transition-colors focus:border-sky-300/70 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
+                className="h-11 w-full appearance-none rounded-md border border-border-light bg-surface-primary px-3 pr-9 text-sm text-text-primary transition-colors hover:border-border-medium focus:border-sky-300/70 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
                 aria-label={localize('com_agent_model')}
               >
                 {selectOptions.map((option) => (
@@ -259,7 +261,7 @@ export default function AgentProfilePage({
                 ))}
               </select>
               <ChevronDown
-                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-white/45"
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-tertiary"
                 aria-hidden="true"
               />
             </div>
@@ -267,10 +269,10 @@ export default function AgentProfilePage({
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-white/10 bg-[#171b24] p-5">
+          <div className="rounded-lg border border-border-light bg-surface-primary-alt p-5">
             <label
               htmlFor="agent-profile-name"
-              className="text-white/38 text-xs font-medium uppercase tracking-[0.12em]"
+              className="text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary"
             >
               {localize('com_agent_name')}
             </label>
@@ -278,12 +280,12 @@ export default function AgentProfilePage({
               id="agent-profile-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="placeholder:text-white/24 mt-3 w-full border-0 bg-transparent p-0 text-4xl font-semibold tracking-normal text-white outline-none focus:ring-0"
+              className="mt-3 w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-normal text-text-primary outline-none placeholder:text-text-tertiary focus:ring-0 sm:text-4xl"
               placeholder={localize('com_agent_name')}
             />
             <label
               htmlFor="agent-profile-description"
-              className="text-white/38 mt-6 block text-xs font-medium uppercase tracking-[0.12em]"
+              className="mt-6 block text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary"
             >
               {localize('com_agent_description')}
             </label>
@@ -292,16 +294,16 @@ export default function AgentProfilePage({
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
-              className="placeholder:text-white/24 hover:border-white/18 mt-3 w-full resize-none rounded-md border border-white/10 bg-[#10131a] px-3 py-3 text-sm leading-6 text-white outline-none transition-colors focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
+              className="mt-3 w-full resize-none rounded-md border border-border-light bg-surface-primary px-3 py-3 text-sm leading-6 text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-border-medium focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
             />
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-[#171b24] p-5">
+          <div className="rounded-lg border border-border-light bg-surface-primary-alt p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <label className="text-white/38 text-xs font-medium uppercase tracking-[0.12em]">
+              <label className="text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary">
                 {localize('com_agent_skills')}
               </label>
-              <Sparkles className="size-4 text-sky-300" aria-hidden="true" />
+              <Sparkles className="size-4 text-sky-700 dark:text-sky-300" aria-hidden="true" />
             </div>
             <div className="flex flex-wrap gap-2">
               {skills.map((skill) => (
@@ -309,14 +311,14 @@ export default function AgentProfilePage({
                   type="button"
                   key={skill}
                   onClick={() => removeSkill(skill)}
-                  className="border-white/12 bg-white/8 hover:bg-rose-400/12 inline-flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-medium text-white transition-colors hover:border-rose-300/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/50"
+                  className="hover:bg-rose-400/12 inline-flex h-8 items-center gap-2 rounded-full border border-border-light bg-surface-hover px-3 text-xs font-medium text-text-primary transition-colors hover:border-rose-300/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/50"
                 >
                   {skill}
                   <X className="size-3.5" aria-hidden="true" />
                 </button>
               ))}
             </div>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <input
                 value={draftSkill}
                 onChange={(event) => setDraftSkill(event.target.value)}
@@ -326,13 +328,13 @@ export default function AgentProfilePage({
                     addSkill();
                   }
                 }}
-                className="placeholder:text-white/28 hover:border-white/18 h-10 min-w-0 flex-1 rounded-md border border-white/10 bg-[#10131a] px-3 text-sm text-white outline-none transition-colors focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
+                className="h-10 min-w-0 flex-1 rounded-md border border-border-light bg-surface-primary px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-border-medium focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
                 placeholder={localize('com_agent_add_skill')}
               />
               <button
                 type="button"
                 onClick={addSkill}
-                className="border-white/12 bg-white/8 hover:bg-white/14 inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-border-light bg-surface-hover px-3 text-sm font-medium text-text-primary transition-colors hover:bg-surface-active-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               >
                 <Plus className="size-4" aria-hidden="true" />
                 {localize('com_ui_add')}
@@ -340,10 +342,10 @@ export default function AgentProfilePage({
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-[#171b24] p-5">
+          <div className="rounded-lg border border-border-light bg-surface-primary-alt p-5">
             <label
               htmlFor="agent-profile-instructions"
-              className="text-white/38 text-xs font-medium uppercase tracking-[0.12em]"
+              className="text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary"
             >
               {localize('com_agent_instructions_markdown')}
             </label>
@@ -352,11 +354,11 @@ export default function AgentProfilePage({
               value={instructions}
               onChange={(event) => setInstructions(event.target.value)}
               rows={10}
-              className="placeholder:text-white/24 hover:border-white/18 mt-3 w-full resize-y rounded-md border border-white/10 bg-[#0c0f15] px-4 py-3 font-mono text-sm leading-6 text-white outline-none transition-colors focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
+              className="mt-3 w-full resize-y rounded-md border border-border-light bg-surface-primary px-4 py-3 font-mono text-sm leading-6 text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-border-medium focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/20"
             />
           </div>
           {saveError ? (
-            <div className="rounded-md border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            <div className="rounded-md border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-100">
               {saveError}
             </div>
           ) : null}

@@ -360,6 +360,9 @@ describe('AgentRoute', () => {
     expect(screen.getByRole('button', { name: /Discord/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /QQ/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /WeChat/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Scan to connect' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Discord/ }));
     expect(screen.getByText('Application ID / Bot username')).toBeInTheDocument();
     expect(screen.getByText('Bot Token / API Key')).toBeInTheDocument();
 

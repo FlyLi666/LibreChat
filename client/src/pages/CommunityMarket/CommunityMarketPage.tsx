@@ -270,9 +270,9 @@ function CommunityMarketBrowser({ identifier, kind }: { identifier?: string; kin
         />
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border-light px-4">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-light px-3 py-2 sm:flex-nowrap sm:gap-3 sm:px-4">
           <OpenSidebar />
-          <div className="relative min-w-0 flex-1">
+          <div className="relative min-w-[180px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
             <Input
               className="h-10 rounded-xl border-border-light bg-surface-primary-alt pl-9"
@@ -282,7 +282,7 @@ function CommunityMarketBrowser({ identifier, kind }: { identifier?: string; kin
             />
           </div>
           <select
-            className="h-10 rounded-xl border border-border-light bg-surface-primary px-3 text-sm text-text-primary"
+            className="h-10 min-w-0 flex-1 rounded-xl border border-border-light bg-surface-primary px-3 text-sm text-text-primary sm:flex-none"
             value={sort}
             onChange={(event) => updateParam('sort', event.target.value)}
           >
@@ -292,7 +292,7 @@ function CommunityMarketBrowser({ identifier, kind }: { identifier?: string; kin
               </option>
             ))}
           </select>
-          <Button className="rounded-xl" variant="outline" onClick={toggleLanguage}>
+          <Button className="shrink-0 rounded-xl" variant="outline" onClick={toggleLanguage}>
             {language === 'zh-CN' ? 'EN' : '中文'}
             <span className="sr-only">当前市场内容语言会缓存在本机浏览器</span>
           </Button>

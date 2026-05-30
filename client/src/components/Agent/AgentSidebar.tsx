@@ -54,16 +54,16 @@ function SidebarActionButton({ action }: { action: SidebarAction }) {
       onClick={action.onClick}
       className={cn(
         'group flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600',
         action.active
-          ? 'bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
-          : 'text-white/72 hover:bg-white/8 hover:text-white',
+          ? 'bg-surface-active-alt text-text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
+          : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
       )}
     >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{action.label}</span>
       {action.badge && (
-        <span className="bg-white/8 text-white/38 rounded-full px-2 py-0.5 text-[10px] font-medium">
+        <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] font-medium text-text-tertiary">
           {action.badge}
         </span>
       )}
@@ -91,7 +91,7 @@ function AgentAvatar({ agentContext }: { agentContext: ResolvedAgentRouteContext
   }
 
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 via-sky-400 to-violet-500 text-sm font-semibold text-white shadow-lg shadow-sky-950/40">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 via-sky-400 to-violet-500 text-sm font-semibold text-text-primary shadow-lg shadow-sky-950/40">
       {initials || 'LA'}
     </div>
   );
@@ -260,17 +260,17 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
   let topicsContent;
   if (!hasResolvedAgent) {
     topicsContent = (
-      <div className="text-white/48 rounded-md border border-white/10 px-3 py-4 text-sm leading-5">
+      <div className="rounded-md border border-border-light px-3 py-4 text-sm leading-5 text-text-tertiary">
         {localize('com_agent_topics_unavailable')}
       </div>
     );
   } else if (isLoading) {
     topicsContent = (
-      <div className="text-white/48 px-3 py-4 text-sm">{localize('com_ui_loading')}</div>
+      <div className="px-3 py-4 text-sm text-text-tertiary">{localize('com_ui_loading')}</div>
     );
   } else if (groupedTopics.length === 0) {
     topicsContent = (
-      <div className="text-white/48 rounded-md border border-white/10 px-3 py-4 text-sm leading-5">
+      <div className="rounded-md border border-border-light px-3 py-4 text-sm leading-5 text-text-tertiary">
         {searchValue.trim()
           ? localize('com_ui_no_results_found')
           : localize('com_agent_topics_empty')}
@@ -283,7 +283,7 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
           type="button"
           aria-expanded={!collapsedTopicGroups.has(group.key)}
           onClick={() => toggleTopicGroup(group.key)}
-          className="text-white/38 hover:text-white/62 mb-1 flex h-7 w-full items-center gap-1 rounded-md px-1 text-left text-[11px] font-medium uppercase tracking-[0.08em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+          className="mb-1 flex h-7 w-full items-center gap-1 rounded-md px-1 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-text-tertiary transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
         >
           {collapsedTopicGroups.has(group.key) ? (
             <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
@@ -291,7 +291,7 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
             <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
           )}
           <span className="min-w-0 flex-1 truncate">{group.label}</span>
-          <span className="text-white/28 text-[10px]">{group.topics.length}</span>
+          <span className="text-[10px] text-text-tertiary">{group.topics.length}</span>
         </button>
         {!collapsedTopicGroups.has(group.key) && (
           <div className="space-y-1">
@@ -305,10 +305,10 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
                   onClick={() => navigate(`/agent/${routeAgentId}/${topic.conversationId}`)}
                   className={cn(
                     'flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600',
                     isActive
-                      ? 'bg-white/10 text-white'
-                      : 'text-white/62 hover:bg-white/7 hover:text-white',
+                      ? 'bg-surface-hover text-text-primary'
+                      : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
                   )}
                 >
                   <FileText className="size-4 shrink-0" aria-hidden="true" />
@@ -327,29 +327,32 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
   return (
     <aside
       data-testid="agent-sidebar"
-      className="hidden h-full w-[292px] shrink-0 border-r border-white/10 bg-[#151820] md:flex md:flex-col"
+      className="hidden h-full w-[292px] shrink-0 border-r border-border-light bg-surface-primary-alt md:flex md:flex-col"
     >
-      <div className="border-b border-white/10 px-4 py-4">
+      <div className="border-b border-border-light px-4 py-4">
         <button
           type="button"
           title="Assistant selector"
-          className="hover:bg-white/8 flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+          className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
         >
           <AgentAvatar agentContext={agentContext} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-white">
+            <div className="truncate text-sm font-semibold text-text-primary">
               {agentContext.displayName}
             </div>
-            <div className="truncate text-xs text-white/45">{agentContext.subtitle}</div>
+            <div className="truncate text-xs text-text-tertiary">{agentContext.subtitle}</div>
           </div>
           {agentContext.lookupStatus === 'resolved' ? (
-            <CheckCircle2 className="size-4 shrink-0 text-emerald-300/80" aria-hidden="true" />
+            <CheckCircle2
+              className="size-4 shrink-0 text-emerald-700 dark:text-emerald-300/80"
+              aria-hidden="true"
+            />
           ) : (
-            <ChevronDown className="size-4 shrink-0 text-white/45" aria-hidden="true" />
+            <ChevronDown className="size-4 shrink-0 text-text-tertiary" aria-hidden="true" />
           )}
         </button>
         {agentContext.lookupStatus !== 'resolved' && (
-          <p className="mt-2 px-2 text-xs leading-5 text-white/45">
+          <p className="mt-2 px-2 text-xs leading-5 text-text-tertiary">
             {localize(
               agentContext.lookupStatus === 'loading'
                 ? 'com_agent_lookup_loading'
@@ -365,17 +368,17 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
         ))}
       </nav>
 
-      <div className="flex min-h-0 flex-col border-t border-white/10 px-3 py-3">
+      <div className="flex min-h-0 flex-col border-t border-border-light px-3 py-3">
         <button
           type="button"
           aria-expanded={!isTopicSectionCollapsed}
           onClick={() => setIsTopicSectionCollapsed((value) => !value)}
-          className="mb-2 flex h-8 items-center justify-between rounded-md px-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+          className="mb-2 flex h-8 items-center justify-between rounded-md px-2 text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
         >
-          <h2 className="text-white/38 text-xs font-medium uppercase tracking-[0.12em]">
+          <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-text-tertiary">
             {localize('com_agent_topics')}
           </h2>
-          <span className="text-white/32 flex items-center gap-1">
+          <span className="flex items-center gap-1 text-text-tertiary">
             <MessageSquare className="size-3.5" aria-hidden="true" />
             {isTopicSectionCollapsed ? (
               <ChevronRight className="size-3.5" aria-hidden="true" />
@@ -388,13 +391,13 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
         {!isTopicSectionCollapsed && (
           <>
             <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/35" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-tertiary" />
               <input
                 ref={searchInputRef}
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
                 placeholder={localize('com_agent_search_topics')}
-                className="focus:bg-white/8 h-9 w-full rounded-md border border-white/10 bg-white/5 pl-8 pr-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/25"
+                className="h-9 w-full rounded-md border border-border-light bg-surface-hover pl-8 pr-3 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-border-medium focus:bg-surface-hover"
               />
             </div>
 
@@ -410,7 +413,7 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
                 type="button"
                 disabled={isFetchingNextPage}
                 onClick={() => fetchNextPage()}
-                className="hover:bg-white/8 mt-3 h-9 rounded-md border border-white/10 px-3 text-sm text-white/70 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-3 h-9 rounded-md border border-border-light px-3 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isFetchingNextPage
                   ? localize('com_ui_loading')
@@ -421,7 +424,10 @@ export default function AgentSidebar({ agentId, conversationId, agentContext }: 
         )}
       </div>
 
-      <nav className="space-y-1 border-t border-white/10 px-3 py-3" aria-label="Assistant tools">
+      <nav
+        className="space-y-1 border-t border-border-light px-3 py-3"
+        aria-label="Assistant tools"
+      >
         {secondaryActions.map((action) => (
           <SidebarActionButton key={action.id} action={action} />
         ))}

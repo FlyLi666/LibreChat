@@ -49,7 +49,7 @@ export default function AgentRoute() {
     content = (
       <div
         data-testid="agent-new-topic-entry"
-        className="flex h-full min-h-0 flex-col items-center justify-center gap-4 bg-[#0f1117] px-6 text-center"
+        className="flex h-full min-h-0 flex-col items-center justify-center gap-4 bg-surface-primary px-6 text-center"
       >
         <div className="max-w-sm space-y-2">
           <h1 className="text-xl font-semibold text-text-primary">
@@ -60,7 +60,7 @@ export default function AgentRoute() {
         <button
           type="button"
           onClick={() => navigate(`/agent/${agentId}/${Constants.NEW_CONVO}`)}
-          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          className="rounded-md bg-surface-submit px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-surface-submit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
         >
           {localize('com_image_new_topic')}
         </button>

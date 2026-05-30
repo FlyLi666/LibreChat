@@ -1,6 +1,8 @@
 import { Hash, ListTodo, Plus, Search, UserRound } from 'lucide-react';
+import { useSetRecoilState } from 'recoil';
 import { useNavigate } from 'react-router-dom';
 import { useLocalize } from '~/hooks';
+import store from '~/store';
 
 const actions = [
   {
@@ -38,6 +40,14 @@ const actions = [
 export default function LobeAiPanel() {
   const navigate = useNavigate();
   const localize = useLocalize();
+  const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
+
+  const handleNavigate = (to: string) => {
+    navigate(to);
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarExpanded(false);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col gap-2 bg-surface-primary-alt p-3">
@@ -49,7 +59,7 @@ export default function LobeAiPanel() {
             key={action.id}
             type="button"
             className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
-            onClick={() => navigate(action.to)}
+            onClick={() => handleNavigate(action.to)}
           >
             <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">{localize(action.title)}</span>
