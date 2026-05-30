@@ -26,6 +26,7 @@ const {
   getEndpointFileConfig,
 } = require('librechat-data-provider');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
+const { createChatImageResponse } = require('~/server/services/hezi/ChatImageBridge');
 const { logViolation } = require('~/cache');
 const TextStream = require('./TextStream');
 const db = require('~/models');
@@ -566,6 +567,43 @@ class BaseClient {
           upsertBalanceFields: db.upsertBalanceFields,
         },
       );
+    }
+
+    const chatImageResponse = await createChatImageResponse({
+      endpoint: this.options.endpoint,
+      req: this.options.req,
+      userId: this.user,
+      prompt: message,
+    });
+    if (chatImageResponse) {
+      if (userMessagePromise) {
+        await userMessagePromise;
+      }
+      /** @type {TMessage} */
+      const responseMessage = {
+        messageId: responseMessageId,
+        conversationId,
+        parentMessageId: userMessage.messageId,
+        isCreatedByUser: false,
+        isEdited,
+        model: this.getResponseModel(),
+        sender: this.sender,
+        promptTokens,
+        iconURL: this.options.iconURL,
+        endpoint: this.options.endpoint,
+        text: chatImageResponse.text,
+        content: chatImageResponse.content,
+        ...(this.metadata ?? {}),
+        metadata: chatImageResponse.metadata,
+      };
+      responseMessage.databasePromise = this.saveMessageToDatabase(
+        responseMessage,
+        saveOptions,
+        user,
+      );
+      this.savedMessageIds.add(responseMessage.messageId);
+      delete responseMessage.tokenCount;
+      return responseMessage;
     }
 
     const { completion, metadata } = await this.sendCompletion(payload, opts);
