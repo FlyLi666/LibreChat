@@ -21,6 +21,7 @@ import { useAuthContext } from '~/hooks';
 import store from '~/store';
 import { createHeziNotebookLink } from './heziNotebookLink';
 import { createHeziImageLink } from './heziImageLink';
+import LobeAiPanel from '~/components/UnifiedSidebar/LobeAiPanel';
 
 const defaultInterface = getConfigDefaults().interface;
 
@@ -108,7 +109,7 @@ export default function useUnifiedSidebarLinks() {
       label: '',
       icon: Sparkles,
       id: 'lobe-ai',
-      onClick: () => navigate('/agent/lobe-ai/new'),
+      Component: LobeAiPanel,
     };
     const wechatBotLink: NavLink = {
       title: 'com_nav_wechat_bot',

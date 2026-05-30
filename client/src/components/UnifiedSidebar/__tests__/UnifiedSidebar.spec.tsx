@@ -29,6 +29,7 @@ jest.mock('~/hooks/Nav/useUnifiedSidebarLinks', () => ({
     const MockIcon = () => null;
     const MockConversationPanel = () => <div data-testid="conversation-panel" />;
     const MockMemoryPanel = () => <div data-testid="memory-panel" />;
+    const MockLobeAiPanel = () => <div data-testid="lobe-ai-panel" />;
     return {
       panelLinks: [
         {
@@ -45,7 +46,7 @@ jest.mock('~/hooks/Nav/useUnifiedSidebarLinks', () => ({
         { title: 'com_nav_documents', icon: MockIcon, id: 'documents' },
       ],
       assistantLinks: [
-        { title: 'com_nav_lobe_ai', icon: MockIcon, id: 'lobe-ai' },
+        { title: 'com_nav_lobe_ai', icon: MockIcon, id: 'lobe-ai', Component: MockLobeAiPanel },
         { title: 'com_nav_community_market', icon: MockIcon, id: 'community-market' },
         { title: 'com_nav_resources', icon: MockIcon, id: 'resources' },
       ],
@@ -110,6 +111,15 @@ describe('UnifiedSidebar mobile drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'com_ui_prompts' }));
 
     expect(screen.getByTestId('memory-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'com_ui_back' })).toBeInTheDocument();
+  });
+
+  it('opens the Lobe AI secondary menu inside the mobile drawer', () => {
+    renderSidebar('/c/new', true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'com_nav_lobe_ai' }));
+
+    expect(screen.getByTestId('lobe-ai-panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'com_ui_back' })).toBeInTheDocument();
   });
 });

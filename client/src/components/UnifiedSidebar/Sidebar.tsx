@@ -1,7 +1,7 @@
 import { memo, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { NavLink } from '~/common';
-import { DEFAULT_PANEL, resolveActivePanel, useActivePanel } from '~/Providers';
+import { DEFAULT_PANEL, useActivePanel } from '~/Providers';
 import SidePanelNav from '~/components/SidePanel/Nav';
 import ExpandedPanel from './ExpandedPanel';
 import { useLocalize } from '~/hooks';
@@ -32,11 +32,12 @@ function Sidebar({
 }) {
   const localize = useLocalize();
   const { active, setActive } = useActivePanel();
-  const secondaryPanelLinks = panelLinks.filter((link) => link.id !== DEFAULT_PANEL);
-  const activePanelId = resolveActivePanel(active, panelLinks);
-  const activePanelLink = secondaryPanelLinks.find((link) => link.id === activePanelId);
-  const showSecondaryPanel =
-    expanded && secondaryPanelLinks.some((link) => link.id === activePanelId && link.Component);
+  const secondaryPanelLinks = [
+    ...panelLinks.filter((link) => link.id !== DEFAULT_PANEL),
+    ...assistantLinks.filter((link) => link.Component),
+  ];
+  const activePanelLink = secondaryPanelLinks.find((link) => link.id === active && link.Component);
+  const showSecondaryPanel = expanded && !!activePanelLink;
 
   useEffect(() => {
     onSecondaryPanelChange?.(showSecondaryPanel);
