@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getTokenHeader, request } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 import cn from '~/utils/cn';
 
@@ -196,8 +197,43 @@ function buildInitialValues() {
   ) as Record<ChannelConfig['id'], Record<string, string>>;
 }
 
+function createAgentChannelHeaders(headers?: HeadersInit) {
+  const nextHeaders = new Headers(headers);
+  const authorization = getTokenHeader();
+
+  if (authorization && !nextHeaders.has('Authorization')) {
+    nextHeaders.set('Authorization', authorization);
+  }
+
+  return nextHeaders;
+}
+
+async function fetchAgentChannel(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  retryOnUnauthorized = true,
+) {
+  const response = await fetch(input, {
+    ...init,
+    credentials: 'include',
+    headers: createAgentChannelHeaders(init.headers),
+  });
+
+  if (response.status !== 401 || !retryOnUnauthorized || !getTokenHeader()) {
+    return response;
+  }
+
+  const refreshed = await request.refreshToken();
+  if (!refreshed?.token) {
+    return response;
+  }
+
+  request.dispatchTokenUpdatedEvent(refreshed.token);
+  return fetchAgentChannel(input, init, false);
+}
+
 async function requestWechatQrCode() {
-  const response = await fetch('/api/agents/channel/wechat/qrcode', {
+  const response = await fetchAgentChannel('/api/agents/channel/wechat/qrcode', {
     headers: { 'Content-Type': 'application/json' },
     method: 'POST',
   });
@@ -223,7 +259,7 @@ async function requestWechatQrCode() {
 }
 
 async function requestWechatQrStatus(qrcode: string) {
-  const response = await fetch(
+  const response = await fetchAgentChannel(
     `/api/agents/channel/wechat/qrcode/${encodeURIComponent(qrcode)}/status`,
   );
 
@@ -235,7 +271,9 @@ async function requestWechatQrStatus(qrcode: string) {
 }
 
 async function requestWechatProvider(agentId: string) {
-  const response = await fetch(`/api/agents/channel/${encodeURIComponent(agentId)}/wechat`);
+  const response = await fetchAgentChannel(
+    `/api/agents/channel/${encodeURIComponent(agentId)}/wechat`,
+  );
 
   if (response.status === 404) return null;
   if (!response.ok) {
@@ -246,10 +284,13 @@ async function requestWechatProvider(agentId: string) {
 }
 
 async function requestWechatStart(agentId: string) {
-  const response = await fetch(`/api/agents/channel/${encodeURIComponent(agentId)}/wechat/start`, {
-    headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
-  });
+  const response = await fetchAgentChannel(
+    `/api/agents/channel/${encodeURIComponent(agentId)}/wechat/start`,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
@@ -259,7 +300,7 @@ async function requestWechatStart(agentId: string) {
 }
 
 async function requestWechatDisconnect(agentId: string) {
-  const response = await fetch(
+  const response = await fetchAgentChannel(
     `/api/agents/channel/${encodeURIComponent(agentId)}/wechat/disconnect`,
     {
       headers: { 'Content-Type': 'application/json' },
@@ -275,7 +316,7 @@ async function requestWechatDisconnect(agentId: string) {
 }
 
 async function requestWechatConnect(agentId: string, credentials: WechatQrCredentials) {
-  const response = await fetch(
+  const response = await fetchAgentChannel(
     `/api/agents/channel/${encodeURIComponent(agentId)}/wechat/connect`,
     {
       body: JSON.stringify({

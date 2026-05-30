@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { setTokenHeader } from 'librechat-data-provider';
 import AgentRoute from '../AgentRoute';
 
 const mockCreateAgentMutateAsync = jest.fn();
@@ -289,6 +290,11 @@ describe('AgentRoute', () => {
         }),
       } as Response;
     });
+    setTokenHeader('agent-channel-test-token');
+  });
+
+  afterEach(() => {
+    setTokenHeader(undefined);
   });
 
   it('renders the assistant layout around the existing chat route', () => {
@@ -383,6 +389,18 @@ describe('AgentRoute', () => {
     expect(screen.getByText('Connect with WeChat QR code')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByText('Scan this QR code with WeChat.')).toBeInTheDocument(),
+    );
+    const qrRequest = (global.fetch as unknown as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/agents/channel/wechat/qrcode',
+    );
+    expect(qrRequest?.[1]).toEqual(
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'POST',
+      }),
+    );
+    expect((qrRequest?.[1]?.headers as Headers).get('Authorization')).toBe(
+      'Bearer agent-channel-test-token',
     );
   });
 
