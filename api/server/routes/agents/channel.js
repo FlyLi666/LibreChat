@@ -416,6 +416,36 @@ function startWechatRuntime(provider, credentials) {
   });
 }
 
+function scheduleWechatRuntimeRestore() {
+  if (process.env.NODE_ENV === 'test') return;
+
+  const timer = setTimeout(async () => {
+    try {
+      const providers = await AgentChannelProvider.find({
+        enabled: true,
+        platform: 'wechat',
+      });
+
+      for (const provider of providers) {
+        try {
+          const credentials = await decryptCredentials(provider.credentials);
+          startWechatRuntime(provider, credentials);
+        } catch (error) {
+          logger?.error?.('[AgentChannel] Failed to restore WeChat runtime', error);
+          await updateProviderRuntime(provider._id, {
+            lastError: error instanceof Error ? error.message : String(error),
+            runtimeStatus: 'failed',
+          });
+        }
+      }
+    } catch (error) {
+      logger?.error?.('[AgentChannel] Failed to query WeChat runtimes for restore', error);
+    }
+  }, 5000);
+
+  timer.unref?.();
+}
+
 router.post('/wechat/qrcode', async (_req, res, next) => {
   try {
     const payload = await fetchWechatJson(
@@ -619,5 +649,8 @@ router._internals = {
   getWechatThreadKey,
   handleWechatInboundMessage,
   normalizeWechatSettings,
+  scheduleWechatRuntimeRestore,
   sendWechatText,
 };
+
+scheduleWechatRuntimeRestore();
