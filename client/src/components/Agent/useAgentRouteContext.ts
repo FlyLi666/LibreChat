@@ -15,7 +15,8 @@ export type ResolvedAgentRouteContext = {
 };
 
 const FALLBACK_AGENT_NAME = 'Lobe AI';
-const AGENT_ID_PATTERN = /^agent[_-]/i;
+const AGENT_ID_PATTERN = /^ag(?:en)?t[_-]/i;
+const LOBE_STYLE_AGENT_ID_PATTERN = /^agt[_-]/i;
 
 function normalizeAgentToken(value: string | null | undefined) {
   return (value ?? '')
@@ -62,6 +63,25 @@ export default function useAgentRouteContext(agentId: string): ResolvedAgentRout
         agent: matchedAgent,
         displayName: matchedAgent.name || FALLBACK_AGENT_NAME,
         subtitle: getAgentSubtitle(matchedAgent, requestedAgentId),
+        lookupStatus: 'resolved' as const,
+      };
+    }
+
+    const lobeFallbackAgent =
+      requestedAgentId === 'lobe-ai' || LOBE_STYLE_AGENT_ID_PATTERN.test(requestedAgentId)
+        ? agents.find(
+            (agent) => normalizeAgentToken(agent.name) === normalizeAgentToken(FALLBACK_AGENT_NAME),
+          )
+        : null;
+
+    if (lobeFallbackAgent) {
+      return {
+        requestedAgentId,
+        routeAgentId: requestedAgentId,
+        resolvedAgentId: lobeFallbackAgent.id,
+        agent: lobeFallbackAgent,
+        displayName: lobeFallbackAgent.name || FALLBACK_AGENT_NAME,
+        subtitle: getAgentSubtitle(lobeFallbackAgent, requestedAgentId),
         lookupStatus: 'resolved' as const,
       };
     }

@@ -79,6 +79,15 @@ jest.mock('~/hooks', () => ({
       com_agent_channel_api: 'API',
       com_agent_channel_api_subtitle: 'Programmatic access',
       com_agent_channel_config_hint: 'Configure this channel inline.',
+      com_agent_channel_add_keyword: 'Add keyword',
+      com_agent_channel_agent_required: 'Save the assistant profile before connecting channels.',
+      com_agent_channel_character_limit: 'Character limit',
+      com_agent_channel_character_limit_desc: 'Maximum characters for one message.',
+      com_agent_channel_concurrency_latest: 'Latest only',
+      com_agent_channel_concurrency_mode: 'Concurrency mode',
+      com_agent_channel_concurrency_mode_desc: 'How concurrent messages are processed.',
+      com_agent_channel_concurrency_parallel: 'Parallel',
+      com_agent_channel_concurrency_queue: 'Queue',
       com_agent_channel_discord: 'Discord',
       com_agent_channel_discord_subtitle: 'Discord bot and server channels',
       com_agent_channel_docs: 'Docs',
@@ -155,6 +164,17 @@ jest.mock('~/hooks', () => ({
       com_agent_channel_runtime_connecting: 'Connecting',
       com_agent_channel_runtime_disconnected: 'Disconnected',
       com_agent_channel_runtime_failed: 'Failed',
+      com_agent_channel_keyword_placeholder: 'Keyword',
+      com_agent_channel_keywords: 'Listening keywords',
+      com_agent_channel_keywords_desc: 'Wake the bot when a keyword is matched.',
+      com_agent_channel_keywords_empty: 'No keywords configured yet.',
+      com_agent_channel_remove_keyword: 'Remove keyword',
+      com_agent_channel_restore_defaults: 'Restore defaults',
+      com_agent_channel_show_tool_calls: 'Show tool calls',
+      com_agent_channel_show_tool_calls_desc: 'Show tool call details while replying.',
+      com_agent_channel_show_usage: 'Show usage statistics',
+      com_agent_channel_show_usage_desc: 'Show token usage, cost, and duration in bot replies.',
+      com_agent_channel_wechat_save_error: 'WeChat settings could not be saved.',
       com_agent_channel_whatsapp: 'WhatsApp',
       com_agent_channel_whatsapp_subtitle: 'WhatsApp Business entry',
       com_agent_channels_subtitle: 'Manage where this assistant can receive messages.',
@@ -267,7 +287,7 @@ describe('AgentRoute', () => {
     mockUpdateAgentMutateAsync.mockResolvedValue({});
 
     global.fetch = jest.fn(async (url) => {
-      if (String(url).endsWith('/api/agents/channel/lobe-ai/wechat')) {
+      if (String(url).endsWith('/api/agents/channel/agent-real-id/wechat')) {
         return {
           ok: false,
           status: 404,
@@ -383,6 +403,11 @@ describe('AgentRoute', () => {
     fireEvent.click(screen.getByRole('button', { name: /WeChat/ }));
     expect(screen.getByRole('button', { name: 'Scan to connect' })).toBeInTheDocument();
     expect(screen.getByText('Advanced settings')).toBeInTheDocument();
+    expect(screen.getByText('Character limit')).toBeInTheDocument();
+    expect(screen.getByText('Concurrency mode')).toBeInTheDocument();
+    expect(screen.getByText('Show usage statistics')).toBeInTheDocument();
+    expect(screen.getByText('Show tool calls')).toBeInTheDocument();
+    expect(screen.getByText('Listening keywords')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Scan to connect' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -408,7 +433,7 @@ describe('AgentRoute', () => {
     global.fetch = jest.fn(async (url, _init) => {
       const urlString = String(url);
 
-      if (urlString.endsWith('/api/agents/channel/lobe-ai/wechat/start')) {
+      if (urlString.endsWith('/api/agents/channel/agent-real-id/wechat/start')) {
         return {
           ok: true,
           json: async () => ({
@@ -419,7 +444,7 @@ describe('AgentRoute', () => {
         } as Response;
       }
 
-      if (urlString.endsWith('/api/agents/channel/lobe-ai/wechat/disconnect')) {
+      if (urlString.endsWith('/api/agents/channel/agent-real-id/wechat/disconnect')) {
         return {
           ok: true,
           json: async () => ({
@@ -430,13 +455,38 @@ describe('AgentRoute', () => {
         } as Response;
       }
 
-      if (urlString.endsWith('/api/agents/channel/lobe-ai/wechat')) {
+      if (urlString.endsWith('/api/agents/channel/agent-real-id/wechat/settings')) {
         return {
           ok: true,
           json: async () => ({
             applicationId: 'wx-bot-001',
             id: 'provider-1',
             runtimeStatus: 'connected',
+            settings: {
+              characterLimit: 1200,
+              concurrencyMode: 'queue',
+              keywords: ['hezi'],
+              showToolCalls: false,
+              showUsage: true,
+            },
+          }),
+        } as Response;
+      }
+
+      if (urlString.endsWith('/api/agents/channel/agent-real-id/wechat')) {
+        return {
+          ok: true,
+          json: async () => ({
+            applicationId: 'wx-bot-001',
+            id: 'provider-1',
+            runtimeStatus: 'connected',
+            settings: {
+              characterLimit: 1200,
+              concurrencyMode: 'queue',
+              keywords: ['hezi'],
+              showToolCalls: false,
+              showUsage: true,
+            },
           }),
         } as Response;
       }
@@ -459,7 +509,7 @@ describe('AgentRoute', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/agents/channel/lobe-ai/wechat/start',
+        '/api/agents/channel/agent-real-id/wechat/start',
         expect.objectContaining({ method: 'POST' }),
       ),
     );
@@ -467,8 +517,31 @@ describe('AgentRoute', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/agents/channel/lobe-ai/wechat/disconnect',
+        '/api/agents/channel/agent-real-id/wechat/disconnect',
         expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/agents/channel/agent-real-id/wechat/settings',
+        expect.objectContaining({
+          body: expect.stringContaining('"characterLimit":1200'),
+          method: 'POST',
+        }),
+      ),
+    );
+  });
+
+  it('resolves Lobe-style agt routes to the real persisted assistant for channels', async () => {
+    renderAgentRoute('/agent/agt_eQjLTXlNOZ75/channel');
+
+    expect(screen.getByTestId('agent-channel-page')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/agents/channel/agent-real-id/wechat',
+        expect.objectContaining({ credentials: 'include' }),
       ),
     );
   });

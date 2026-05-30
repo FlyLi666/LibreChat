@@ -22,6 +22,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getTokenHeader, request } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 import cn from '~/utils/cn';
+import type { ResolvedAgentRouteContext } from '../useAgentRouteContext';
 
 type FieldKind = 'text' | 'password';
 
@@ -68,6 +69,23 @@ type WechatProvider = {
   lastError?: string;
   lastMessageAt?: string;
   runtimeStatus: 'connecting' | 'connected' | 'disconnected' | 'failed';
+  settings?: Partial<WechatSettings>;
+};
+type WechatSettings = {
+  characterLimit: number;
+  concurrencyMode: 'queue' | 'parallel' | 'latest';
+  keywords: string[];
+  showToolCalls: boolean;
+  showUsage: boolean;
+};
+
+const REAL_AGENT_ID_PATTERN = /^ag(?:en)?t[_-]/i;
+const DEFAULT_WECHAT_SETTINGS: WechatSettings = {
+  characterLimit: 2000,
+  concurrencyMode: 'queue',
+  keywords: [],
+  showToolCalls: false,
+  showUsage: false,
 };
 
 const channelConfigs: ChannelConfig[] = [
@@ -315,7 +333,11 @@ async function requestWechatDisconnect(agentId: string) {
   return (await response.json()) as WechatProvider;
 }
 
-async function requestWechatConnect(agentId: string, credentials: WechatQrCredentials) {
+async function requestWechatConnect(
+  agentId: string,
+  credentials: WechatQrCredentials,
+  settings: WechatSettings,
+) {
   const response = await fetchAgentChannel(
     `/api/agents/channel/${encodeURIComponent(agentId)}/wechat/connect`,
     {
@@ -324,7 +346,25 @@ async function requestWechatConnect(agentId: string, credentials: WechatQrCreden
         bot_token: credentials.bot_token,
         ilink_bot_id: credentials.ilink_bot_id,
         ilink_user_id: credentials.ilink_user_id,
+        settings,
       }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return (await response.json()) as WechatProvider;
+}
+
+async function requestWechatSettings(agentId: string, settings: WechatSettings) {
+  const response = await fetchAgentChannel(
+    `/api/agents/channel/${encodeURIComponent(agentId)}/wechat/settings`,
+    {
+      body: JSON.stringify({ settings }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     },
@@ -366,9 +406,17 @@ function getWechatRuntimeClassName(status: WechatProvider['runtimeStatus']) {
   return 'bg-surface-hover text-text-secondary';
 }
 
-export default function AgentChannelsPage({ agentId }: { agentId: string }) {
+export default function AgentChannelsPage({
+  agentContext,
+  agentId,
+}: {
+  agentContext?: ResolvedAgentRouteContext;
+  agentId: string;
+}) {
   const localize = useLocalize();
   const wechatPollTimer = useRef<number | null>(null);
+  const channelAgentId =
+    agentContext?.resolvedAgentId ?? (REAL_AGENT_ID_PATTERN.test(agentId) ? agentId : '');
   const [selectedId, setSelectedId] = useState<ChannelConfig['id']>('wechat');
   const [values, setValues] = useState(buildInitialValues);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -380,6 +428,8 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
   const [wechatQrCode, setWechatQrCode] = useState('');
   const [wechatQrError, setWechatQrError] = useState('');
   const [wechatCredentials, setWechatCredentials] = useState<WechatQrCredentials | null>(null);
+  const [wechatSettings, setWechatSettings] = useState<WechatSettings>(DEFAULT_WECHAT_SETTINGS);
+  const [wechatKeywordDraft, setWechatKeywordDraft] = useState('');
   const [wechatProvider, setWechatProvider] = useState<WechatProvider | null>(null);
   const [wechatActionBusy, setWechatActionBusy] = useState<'start' | 'disconnect' | null>(null);
   const [wechatActionError, setWechatActionError] = useState('');
@@ -403,11 +453,55 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
     }));
   };
 
-  const handleSave = () => {
+  const updateWechatSetting = <Key extends keyof WechatSettings>(
+    key: Key,
+    value: WechatSettings[Key],
+  ) => {
+    setWechatSettings((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const addWechatKeyword = () => {
+    const keyword = wechatKeywordDraft.trim();
+    if (!keyword) return;
+
+    setWechatSettings((current) => ({
+      ...current,
+      keywords: [...new Set([...current.keywords, keyword])].slice(0, 20),
+    }));
+    setWechatKeywordDraft('');
+  };
+
+  const removeWechatKeyword = (keyword: string) => {
+    setWechatSettings((current) => ({
+      ...current,
+      keywords: current.keywords.filter((item) => item !== keyword),
+    }));
+  };
+
+  const restoreWechatDefaults = () => {
+    setWechatSettings(DEFAULT_WECHAT_SETTINGS);
+    setWechatKeywordDraft('');
+  };
+
+  const handleSave = async () => {
     if (!selectedChannel.scan) {
       setLastSavedPayload(
         buildChannelPayload(agentId, selectedChannel, values[selectedChannel.id] ?? {}),
       );
+    } else if (wechatProvider && channelAgentId) {
+      try {
+        const provider = await requestWechatSettings(channelAgentId, wechatSettings);
+        setWechatProvider(provider);
+        setWechatActionError('');
+      } catch (error) {
+        setWechatActionError(
+          error instanceof Error ? error.message : localize('com_agent_channel_wechat_save_error'),
+        );
+        return;
+      }
     }
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
@@ -440,9 +534,13 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
           };
           setWechatCredentials(credentials);
 
-          if (result.bot_token && result.ilink_bot_id && result.ilink_user_id) {
+          if (result.bot_token && result.ilink_bot_id && result.ilink_user_id && channelAgentId) {
             try {
-              const provider = await requestWechatConnect(agentId, credentials);
+              const provider = await requestWechatConnect(
+                channelAgentId,
+                credentials,
+                wechatSettings,
+              );
               setWechatProvider(provider);
             } catch (error) {
               setWechatQrStatus('error');
@@ -466,6 +564,10 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
 
   const startWechatQrFlow = async () => {
     clearWechatPollTimer();
+    if (!channelAgentId) {
+      setWechatActionError(localize('com_agent_channel_agent_required'));
+      return;
+    }
     setWechatQrOpen(true);
     setWechatQrStatus('loading');
     setWechatQrError('');
@@ -496,11 +598,15 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
   };
 
   const handleWechatStart = async () => {
+    if (!channelAgentId) {
+      setWechatActionError(localize('com_agent_channel_agent_required'));
+      return;
+    }
     setWechatActionBusy('start');
     setWechatActionError('');
 
     try {
-      const provider = await requestWechatStart(agentId);
+      const provider = await requestWechatStart(channelAgentId);
       setWechatProvider(provider);
     } catch (error) {
       setWechatActionError(
@@ -512,11 +618,15 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
   };
 
   const handleWechatDisconnect = async () => {
+    if (!channelAgentId) {
+      setWechatActionError(localize('com_agent_channel_agent_required'));
+      return;
+    }
     setWechatActionBusy('disconnect');
     setWechatActionError('');
 
     try {
-      const provider = await requestWechatDisconnect(agentId);
+      const provider = await requestWechatDisconnect(channelAgentId);
       setWechatProvider(provider);
     } catch (error) {
       setWechatActionError(
@@ -533,10 +643,26 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
 
   useEffect(() => {
     let active = true;
-    requestWechatProvider(agentId)
+    if (!channelAgentId) {
+      setWechatProvider(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    requestWechatProvider(channelAgentId)
       .then((provider) => {
         if (active) {
           setWechatProvider(provider);
+          if (provider?.settings) {
+            setWechatSettings((current) => ({
+              ...current,
+              ...provider.settings,
+              keywords: Array.isArray(provider.settings?.keywords)
+                ? provider.settings.keywords
+                : current.keywords,
+            }));
+          }
         }
       })
       .catch(() => {
@@ -548,7 +674,7 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
     return () => {
       active = false;
     };
-  }, [agentId]);
+  }, [channelAgentId]);
 
   return (
     <div
@@ -639,7 +765,7 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
                   {localize(`com_agent_channel_${selectedChannel.id}`)}
                 </h1>
                 <span className="rounded-full border border-border-light px-2 py-0.5 text-xs text-text-tertiary">
-                  {agentId}
+                  {channelAgentId || agentId}
                 </span>
               </div>
               <p className="mt-2 text-sm text-text-tertiary">
@@ -736,7 +862,8 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
               <button
                 type="button"
                 onClick={startWechatQrFlow}
-                className="inline-flex h-12 items-center gap-3 rounded-lg bg-surface-submit px-5 text-sm font-semibold text-white transition-colors hover:bg-surface-submit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                disabled={!channelAgentId}
+                className="inline-flex h-12 items-center gap-3 rounded-lg bg-surface-submit px-5 text-sm font-semibold text-white transition-colors hover:bg-surface-submit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <QrCode className="size-5" aria-hidden="true" />
                 {localize('com_agent_channel_scan_connect')}
@@ -812,7 +939,196 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
                 />
                 {localize('com_agent_advanced_settings')}
               </button>
-              {advancedOpen ? (
+              {advancedOpen && selectedChannel.scan ? (
+                <div className="mt-6 space-y-8">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={restoreWechatDefaults}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-border-light px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+                    >
+                      <RefreshCw className="size-4" aria-hidden="true" />
+                      {localize('com_agent_channel_restore_defaults')}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
+                    <div>
+                      <label
+                        htmlFor="wechat-character-limit"
+                        className="block text-base font-semibold text-text-primary"
+                      >
+                        {localize('com_agent_channel_character_limit')}
+                      </label>
+                      <p className="mt-2 text-sm leading-5 text-text-tertiary">
+                        {localize('com_agent_channel_character_limit_desc')}
+                      </p>
+                    </div>
+                    <input
+                      id="wechat-character-limit"
+                      type="number"
+                      min={1}
+                      max={20000}
+                      value={wechatSettings.characterLimit}
+                      onChange={(event) =>
+                        updateWechatSetting(
+                          'characterLimit',
+                          Number.parseInt(event.target.value, 10) || 1,
+                        )
+                      }
+                      className="h-12 w-full rounded-lg border border-border-light bg-surface-hover px-4 text-sm text-text-primary outline-none transition-colors hover:border-border-medium focus:border-border-medium focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
+                    <div>
+                      <label
+                        htmlFor="wechat-concurrency-mode"
+                        className="block text-base font-semibold text-text-primary"
+                      >
+                        {localize('com_agent_channel_concurrency_mode')}
+                      </label>
+                      <p className="mt-2 text-sm leading-5 text-text-tertiary">
+                        {localize('com_agent_channel_concurrency_mode_desc')}
+                      </p>
+                    </div>
+                    <select
+                      id="wechat-concurrency-mode"
+                      value={wechatSettings.concurrencyMode}
+                      onChange={(event) =>
+                        updateWechatSetting(
+                          'concurrencyMode',
+                          event.target.value as WechatSettings['concurrencyMode'],
+                        )
+                      }
+                      className="h-12 w-full rounded-lg border border-border-light bg-surface-hover px-4 text-sm text-text-primary outline-none transition-colors hover:border-border-medium focus:border-border-medium focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="queue">
+                        {localize('com_agent_channel_concurrency_queue')}
+                      </option>
+                      <option value="parallel">
+                        {localize('com_agent_channel_concurrency_parallel')}
+                      </option>
+                      <option value="latest">
+                        {localize('com_agent_channel_concurrency_latest')}
+                      </option>
+                    </select>
+                  </div>
+
+                  {[
+                    [
+                      'showUsage',
+                      'com_agent_channel_show_usage',
+                      'com_agent_channel_show_usage_desc',
+                    ],
+                    [
+                      'showToolCalls',
+                      'com_agent_channel_show_tool_calls',
+                      'com_agent_channel_show_tool_calls_desc',
+                    ],
+                  ].map(([key, labelKey, descKey]) => (
+                    <div
+                      key={key}
+                      className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)] md:items-center"
+                    >
+                      <div>
+                        <p className="text-base font-semibold text-text-primary">
+                          {localize(labelKey)}
+                        </p>
+                        <p className="mt-2 text-sm leading-5 text-text-tertiary">
+                          {localize(descKey)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={wechatSettings[key as keyof WechatSettings] === true}
+                        onClick={() =>
+                          updateWechatSetting(
+                            key as 'showUsage' | 'showToolCalls',
+                            !(wechatSettings[key as keyof WechatSettings] === true),
+                          )
+                        }
+                        className={cn(
+                          'relative h-7 w-12 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600',
+                          wechatSettings[key as keyof WechatSettings] === true
+                            ? 'bg-emerald-500'
+                            : 'bg-surface-hover',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'absolute top-1 size-5 rounded-full bg-white shadow transition-transform',
+                            wechatSettings[key as keyof WechatSettings] === true
+                              ? 'translate-x-6'
+                              : 'translate-x-1',
+                          )}
+                        />
+                      </button>
+                    </div>
+                  ))}
+
+                  <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
+                    <div>
+                      <p className="text-base font-semibold text-text-primary">
+                        {localize('com_agent_channel_keywords')}
+                      </p>
+                      <p className="mt-2 text-sm leading-5 text-text-tertiary">
+                        {localize('com_agent_channel_keywords_desc')}
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {wechatSettings.keywords.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {wechatSettings.keywords.map((keyword) => (
+                            <span
+                              key={keyword}
+                              className="inline-flex h-8 items-center gap-2 rounded-full border border-border-light px-3 text-sm text-text-secondary"
+                            >
+                              {keyword}
+                              <button
+                                type="button"
+                                onClick={() => removeWechatKeyword(keyword)}
+                                className="rounded-full p-0.5 text-text-tertiary hover:bg-surface-hover hover:text-text-primary"
+                                aria-label={localize('com_agent_channel_remove_keyword')}
+                              >
+                                <X className="size-3" aria-hidden="true" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-text-tertiary">
+                          {localize('com_agent_channel_keywords_empty')}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          value={wechatKeywordDraft}
+                          onChange={(event) => setWechatKeywordDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              addWechatKeyword();
+                            }
+                          }}
+                          placeholder={localize('com_agent_channel_keyword_placeholder')}
+                          className="h-11 min-w-0 flex-1 rounded-lg border border-dashed border-border-light bg-surface-hover px-4 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-border-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={addWechatKeyword}
+                          className="h-11 rounded-lg border border-dashed border-border-light px-4 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+                        >
+                          {localize('com_agent_channel_add_keyword')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {advancedOpen && !selectedChannel.scan ? (
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   {advancedFields.map((field) => {
                     const fieldKey = `${selectedChannel.id}-${field.id}`;
@@ -863,7 +1179,7 @@ export default function AgentChannelsPage({ agentId }: { agentId: string }) {
                     </span>
                     <input
                       className="h-11 w-full rounded-lg border border-border-light bg-surface-hover px-3 text-sm text-text-primary outline-none focus:border-border-medium"
-                      value={`/api/agents/${agentId}/channels/${selectedChannel.id}/callback`}
+                      value={`/api/agents/${channelAgentId || agentId}/channels/${selectedChannel.id}/callback`}
                       readOnly
                     />
                   </label>

@@ -38,7 +38,7 @@ export default function AgentRoute() {
   } else if (section === 'topics') {
     content = <AgentTopicsPage agentId={agentId} />;
   } else if (section === 'channel') {
-    content = <AgentChannelsPage agentId={agentId} />;
+    content = <AgentChannelsPage agentId={agentId} agentContext={agentContext} />;
   } else if (section === 'task') {
     content = <AgentTasksPage agentId={agentId} taskId={taskId} />;
   } else if (isConversationPage && conversationId) {

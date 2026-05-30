@@ -1,6 +1,12 @@
 const express = require('express');
 const request = require('supertest');
 
+const mockGetAgent = jest.fn();
+
+jest.mock('~/models', () => ({
+  getAgent: (...args) => mockGetAgent(...args),
+}));
+
 describe('agent channel routes', () => {
   let app;
   let channelRouter;
@@ -36,6 +42,7 @@ describe('agent channel routes', () => {
       req.user = { id: 'user-123' };
       next();
     });
+    mockGetAgent.mockResolvedValue({ id: 'agent-real-id', user: 'user-123' });
     jest.resetModules();
     channelRouter = require('../channel');
     channelRouter.locals = {};
@@ -75,6 +82,14 @@ describe('agent channel routes', () => {
         method: 'GET',
       }),
     );
+  });
+
+  it('rejects WeChat provider binding when the route id is not a real Agent', async () => {
+    mockGetAgent.mockResolvedValueOnce(null);
+
+    await request(app).get('/api/agents/channel/lobe-ai/wechat').expect(404);
+
+    expect(mockGetAgent).toHaveBeenCalledWith({ id: 'lobe-ai' });
   });
 
   it('extracts text from WeChat message items', () => {
