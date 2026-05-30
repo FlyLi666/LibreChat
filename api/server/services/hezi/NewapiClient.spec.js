@@ -155,7 +155,7 @@ describe('NewapiClient', () => {
     await expect(
       createRedemptionCodes({
         name: 'hezi_invite_smoke',
-        quota: 2500000,
+        quota: 250000000,
         count: 2,
       }),
     ).resolves.toEqual(['redeem-a', 'redeem-b']);
@@ -170,7 +170,7 @@ describe('NewapiClient', () => {
         }),
         body: JSON.stringify({
           name: 'hezi_invite_smoke',
-          quota: 2500000,
+          quota: 250000000,
           count: 2,
         }),
         signal: expect.any(AbortSignal),

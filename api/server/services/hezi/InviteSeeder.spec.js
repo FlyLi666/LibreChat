@@ -2,7 +2,7 @@ const { DEFAULT_INVITE_QUOTA, buildInviteDocs, createInviteQuotaCodes } = requir
 
 describe('InviteSeeder', () => {
   test('defaults new invite batches to the PRD launch quota', () => {
-    expect(DEFAULT_INVITE_QUOTA).toBe(2500000);
+    expect(DEFAULT_INVITE_QUOTA).toBe(250000000);
   });
 
   test('binds one generated NewAPI redemption code to each invite code', async () => {
@@ -24,7 +24,7 @@ describe('InviteSeeder', () => {
 
     expect(createRedemptionCodes).toHaveBeenCalledWith({
       name: 'hezi_launch_17799396',
-      quota: 2500000,
+      quota: 250000000,
       count: 2,
     });
     expect(docs).toEqual([

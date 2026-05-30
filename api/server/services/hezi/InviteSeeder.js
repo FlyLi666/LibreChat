@@ -1,4 +1,4 @@
-const DEFAULT_INVITE_QUOTA = 2500000;
+const DEFAULT_INVITE_QUOTA = 250000000;
 
 function sanitizeRedemptionNamePart(value) {
   return (

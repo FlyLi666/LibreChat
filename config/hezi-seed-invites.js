@@ -3,7 +3,7 @@
  *
  * Usage:
  *   npm run hezi-seed-invites -- --count=10 --note="launch batch"
- *   npm run hezi-seed-invites -- --codes=ABC123,XYZ789 --quota=2500000
+ *   npm run hezi-seed-invites -- --codes=ABC123,XYZ789 --quota=250000000
  *   npm run hezi-seed-invites -- --count=10 --quota=0  # no NewAPI top-up codes
  *
  * Codes are uppercase, persisted via bulkUpsertInviteCodes (idempotent).
