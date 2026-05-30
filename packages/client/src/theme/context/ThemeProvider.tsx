@@ -197,6 +197,7 @@ export function ThemeProvider({
 
     root.classList.remove(darkMode ? 'light' : 'dark');
     root.classList.add(darkMode ? 'dark' : 'light');
+    root.style.colorScheme = darkMode ? 'dark' : 'light';
   }, []);
 
   // Apply theme mode whenever theme changes

@@ -225,7 +225,7 @@ const ChatForm = memo(function ChatForm({
   const baseClasses = useMemo(
     () =>
       cn(
-        'm-0 w-full resize-none bg-transparent px-5 py-4 text-[15px] leading-6 placeholder-white/40 text-white [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)]',
+        'm-0 w-full resize-none bg-transparent px-5 py-4 text-[15px] leading-6 text-text-primary placeholder-black/40 dark:text-white dark:placeholder-white/40 [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)]',
         isCollapsed ? 'max-h-[52px]' : 'max-h-[45vh] md:max-h-[55vh]',
         isMoreThanThreeRows ? 'pl-5' : 'px-5',
       ),
@@ -275,11 +275,11 @@ const ChatForm = memo(function ChatForm({
             className={cn(
               'relative flex w-full flex-grow flex-col overflow-visible rounded-[30px] border pb-3 text-text-primary transition-all duration-200',
               isTextAreaFocused
-                ? 'border-white/25 shadow-[0_24px_90px_rgba(0,0,0,0.38)]'
-                : 'shadow-[0_18px_70px_rgba(0,0,0,0.28)]',
+                ? 'border-border-medium shadow-[0_18px_60px_rgba(0,0,0,0.16)] dark:border-white/25 dark:shadow-[0_24px_90px_rgba(0,0,0,0.38)]'
+                : 'shadow-[0_12px_42px_rgba(0,0,0,0.10)] dark:shadow-[0_18px_70px_rgba(0,0,0,0.28)]',
               isTemporary
-                ? 'border-violet-500/40 bg-violet-950/40'
-                : 'border-white/12 bg-[#12151d]/95 backdrop-blur-xl',
+                ? 'border-violet-500/40 bg-violet-50/90 dark:bg-violet-950/40'
+                : 'bg-surface-secondary/95 dark:border-white/12 border-border-light backdrop-blur-xl dark:bg-[#12151d]/95',
             )}
           >
             <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
@@ -379,7 +379,7 @@ const ChatForm = memo(function ChatForm({
                 />
               </div>
               <div
-                className="hidden max-w-[220px] shrink-0 sm:block [&_button:hover]:bg-white/[0.12] [&_button]:h-9 [&_button]:rounded-full [&_button]:border-white/10 [&_button]:bg-white/[0.07] [&_button]:text-white/75"
+                className="hidden max-w-[220px] shrink-0 sm:block [&_button:hover]:bg-surface-hover dark:[&_button:hover]:bg-white/[0.12] [&_button]:h-9 [&_button]:rounded-full [&_button]:border-border-light [&_button]:bg-surface-tertiary [&_button]:text-text-secondary dark:[&_button]:border-white/10 dark:[&_button]:bg-white/[0.07] dark:[&_button]:text-white/75"
                 onClick={(event) => event.preventDefault()}
               >
                 <ModelSelector startupConfig={startupConfig} />

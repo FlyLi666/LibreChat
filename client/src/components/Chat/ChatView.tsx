@@ -89,10 +89,10 @@ function ChatView({ index = 0 }: { index?: number }) {
               <Header />
               {isLandingPage ? (
                 <>
-                  <div className="flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto bg-[#090b10] px-3 pt-14 text-white transition-colors duration-200 sm:justify-center">
+                  <div className="flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto bg-surface-primary px-3 pt-14 text-text-primary transition-colors duration-200 dark:bg-[#090b10] dark:text-white sm:justify-center">
                     {content}
                   </div>
-                  <div className="shrink-0 bg-[#090b10] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+                  <div className="shrink-0 bg-surface-primary px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 dark:bg-[#090b10]">
                     <div className="mx-auto w-full max-w-4xl transition-all duration-200 xl:max-w-5xl">
                       <ChatForm index={index} />
                       <ConversationStarters />

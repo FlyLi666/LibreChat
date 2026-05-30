@@ -48,7 +48,7 @@ function Header() {
   const agentLabel = agentId === 'lobe-ai' ? 'Lobe AI' : agentId;
 
   return (
-    <div className="via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 absolute top-0 z-10 flex h-[52px] w-full items-center justify-between bg-gradient-to-b from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">
+    <div className="bg-surface-primary/90 absolute top-0 z-10 flex h-[52px] w-full items-center justify-between p-2 font-semibold text-text-primary backdrop-blur-md dark:bg-[#090b10]/85">
       <div className="hide-scrollbar flex w-full items-center justify-between gap-2 overflow-x-auto">
         <div className="mx-1 flex items-center">
           <OpenSidebar className="md:hidden" />

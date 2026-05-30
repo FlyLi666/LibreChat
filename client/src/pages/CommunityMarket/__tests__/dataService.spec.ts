@@ -46,6 +46,26 @@ describe('community market data service', () => {
     expect(detail?.name).toBe('Research Assistant');
   });
 
+  it('normalizes localized object fields before the UI renders market details', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: jest.fn().mockResolvedValue({
+        category: { en: 'Coding', zh_CN: '编程' },
+        description: { en: 'Security helper', zh_CN: '安全助手' },
+        identifier: 'skill-vetter',
+        name: { en: 'skill-vetter', zh_CN: '技能审查' },
+      }),
+      ok: true,
+    }) as jest.Mock;
+
+    const detail = await getMarketDetail('skill', 'skill-vetter', 'zh-CN');
+
+    expect(detail).toMatchObject({
+      category: '编程',
+      description: '安全助手',
+      name: '技能审查',
+    });
+  });
+
   it('can fork a local Agent market item into the local agent store', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       json: jest.fn().mockResolvedValue({

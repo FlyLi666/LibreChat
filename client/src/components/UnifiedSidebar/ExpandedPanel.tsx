@@ -1,10 +1,10 @@
-import { memo, useCallback, lazy, Suspense } from 'react';
+import { memo, useCallback, useContext, lazy, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecoilValue } from 'recoil';
-import { HelpCircle, SquarePen } from 'lucide-react';
+import { HelpCircle, Monitor, Moon, SquarePen, Sun } from 'lucide-react';
 import { QueryKeys } from 'librechat-data-provider';
-import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
+import { Skeleton, Sidebar, Button, TooltipAnchor, ThemeContext } from '@librechat/client';
 import type { NavLink } from '~/common';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import { useActivePanel, resolveActivePanel, DEFAULT_PANEL } from '~/Providers';
@@ -13,6 +13,71 @@ import { clearMessagesCache, cn } from '~/utils';
 import store from '~/store';
 
 const AccountSettings = lazy(() => import('~/components/Nav/AccountSettings'));
+
+const themeOptions = [
+  { value: 'system', labelKey: 'com_nav_theme_system', icon: Monitor },
+  { value: 'dark', labelKey: 'com_nav_theme_dark', icon: Moon },
+  { value: 'light', labelKey: 'com_nav_theme_light', icon: Sun },
+] as const;
+
+function SidebarThemeSwitch({ expanded }: { expanded: boolean }) {
+  const localize = useLocalize();
+  const { theme, setTheme } = useContext(ThemeContext);
+  const activeTheme = themeOptions.some((option) => option.value === theme) ? theme : 'system';
+  const currentIndex = themeOptions.findIndex((option) => option.value === activeTheme);
+  const currentOption = themeOptions[currentIndex] ?? themeOptions[0];
+  const nextOption = themeOptions[(currentIndex + 1) % themeOptions.length];
+  const CurrentIcon = currentOption.icon;
+
+  if (!expanded) {
+    return (
+      <TooltipAnchor
+        side="right"
+        description={`${localize('com_nav_theme')}: ${localize(currentOption.labelKey)}`}
+        render={
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={`${localize('com_nav_theme')}: ${localize(currentOption.labelKey)}`}
+            className="h-9 w-9 rounded-lg text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+            onClick={() => setTheme(nextOption.value)}
+          >
+            <CurrentIcon className="h-5 w-5" aria-hidden="true" />
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border-light bg-surface-primary p-1">
+      <div className="mb-1 px-1 text-xs font-medium text-text-secondary">
+        {localize('com_nav_theme')}
+      </div>
+      <div className="grid grid-cols-3 gap-1">
+        {themeOptions.map((option) => {
+          const Icon = option.icon;
+          const isActive = option.value === activeTheme;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={isActive}
+              aria-label={localize(option.labelKey)}
+              onClick={() => setTheme(option.value)}
+              className={cn(
+                'flex h-8 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary',
+                isActive && 'bg-surface-active-alt text-text-primary',
+              )}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const NewChatButton = memo(function NewChatButton({
   setActive,
@@ -395,6 +460,7 @@ function ExpandedPanel({
       )}
 
       <div className="mt-auto flex flex-col gap-1">
+        <SidebarThemeSwitch expanded={expanded} />
         <TooltipAnchor
           side="right"
           description={localize('com_nav_help_faq')}

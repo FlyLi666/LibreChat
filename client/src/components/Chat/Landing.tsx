@@ -256,7 +256,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
               <SplitText
                 key={`split-text-${name}`}
                 text={name}
-                className={`${getTextSizeClass(name)} font-medium text-white`}
+                className={`${getTextSizeClass(name)} font-medium text-text-primary dark:text-white`}
                 delay={50}
                 textAlign="center"
                 animationFrom={{ opacity: 0, transform: 'translate3d(0,50px,0)' }}
@@ -271,7 +271,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
             <SplitText
               key={`split-text-${greetingText}${user?.name ? '-user' : ''}`}
               text={greetingText}
-              className={`${getTextSizeClass(greetingText)} font-medium text-white`}
+              className={`${getTextSizeClass(greetingText)} font-medium text-text-primary dark:text-white`}
               delay={50}
               textAlign="center"
               animationFrom={{ opacity: 0, transform: 'translate3d(0,50px,0)' }}
@@ -284,7 +284,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           )}
         </div>
         {description && (
-          <div className="animate-fadeIn mt-4 max-w-md text-center text-sm font-normal text-white/60">
+          <div className="animate-fadeIn mt-4 max-w-md text-center text-sm font-normal text-text-secondary dark:text-white/60">
             {description}
           </div>
         )}
@@ -294,7 +294,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
               key={chip}
               type="button"
               onClick={() => applyPrompt(`围绕「${chip}」给我 3 个可直接执行的建议。`)}
-              className="rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-xs text-white/75 transition hover:border-white/25 hover:bg-white/[0.12] hover:text-white sm:px-3 sm:py-1.5 sm:text-sm"
+              className="rounded-full border border-border-light bg-surface-secondary px-2.5 py-1 text-xs text-text-secondary transition hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary dark:border-white/10 dark:bg-white/[0.07] dark:text-white/75 dark:hover:border-white/25 dark:hover:bg-white/[0.12] dark:hover:text-white sm:px-3 sm:py-1.5 sm:text-sm"
             >
               {chip}
             </button>
@@ -304,29 +304,29 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           {visibleTasks.map((task) => (
             <div
               key={task.title}
-              className="group min-h-[112px] rounded-xl border border-white/10 bg-white/[0.06] p-3 text-left shadow-[0_12px_42px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.1] sm:min-h-[124px] sm:rounded-2xl sm:p-4"
+              className="group min-h-[112px] rounded-xl border border-border-light bg-surface-secondary p-3 text-left shadow-[0_12px_42px_rgba(0,0,0,0.08)] transition hover:-translate-y-0.5 hover:border-border-medium hover:bg-surface-tertiary dark:border-white/10 dark:bg-white/[0.06] dark:shadow-[0_12px_42px_rgba(0,0,0,0.18)] dark:hover:border-white/25 dark:hover:bg-white/[0.1] sm:min-h-[124px] sm:rounded-2xl sm:p-4"
             >
               <div className="mb-2 flex items-center justify-between gap-2 sm:mb-3">
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60">
+                <span className="rounded-full bg-surface-tertiary px-2 py-0.5 text-xs text-text-secondary dark:bg-white/10 dark:text-white/60">
                   {task.tag}
                 </span>
-                <Wand2 className="size-4 text-white/40 transition group-hover:text-white/80" />
+                <Wand2 className="size-4 text-text-tertiary transition group-hover:text-text-primary dark:text-white/40 dark:group-hover:text-white/80" />
               </div>
               <button
                 type="button"
                 onClick={() => applyPrompt(task.prompt)}
-                className="block w-full text-left text-xs font-medium leading-5 text-white sm:text-sm"
+                className="block w-full text-left text-xs font-medium leading-5 text-text-primary dark:text-white sm:text-sm"
               >
                 {task.title}
               </button>
-              <p className="mt-1 hidden text-xs leading-5 text-white/50 sm:line-clamp-2 sm:block">
+              <p className="mt-1 hidden text-xs leading-5 text-text-secondary dark:text-white/50 sm:line-clamp-2 sm:block">
                 {task.prompt}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-1.5 opacity-90 sm:mt-4 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => appendPrompt(task.prompt)}
-                  className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[11px] text-white/70 transition hover:bg-white/15 hover:text-white sm:px-2.5 sm:text-xs"
+                  className="inline-flex items-center gap-1 rounded-full bg-surface-tertiary px-2 py-1 text-[11px] text-text-secondary transition hover:bg-surface-hover hover:text-text-primary dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15 dark:hover:text-white sm:px-2.5 sm:text-xs"
                 >
                   <Plus className="size-3.5" />
                   {addTaskLabel}
@@ -338,7 +338,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
                       `请按「目标 / 背景 / 输出格式 / 验收标准」模板处理：\n${task.prompt}`,
                     )
                   }
-                  className="rounded-full px-2 py-1 text-[11px] text-white/55 transition hover:bg-white/10 hover:text-white sm:px-2.5 sm:text-xs"
+                  className="rounded-full px-2 py-1 text-[11px] text-text-secondary transition hover:bg-surface-hover hover:text-text-primary dark:text-white/55 dark:hover:bg-white/10 dark:hover:text-white sm:px-2.5 sm:text-xs"
                 >
                   {templateLabel}
                 </button>
@@ -350,7 +350,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           type="button"
           onClick={() => setTaskPage((page) => page + 1)}
           className={cn(
-            'mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-sm text-white/65 transition hover:border-white/20 hover:bg-white/[0.11] hover:text-white',
+            'mt-4 inline-flex items-center gap-2 rounded-full border border-border-light bg-surface-secondary px-3 py-1.5 text-sm text-text-secondary transition hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary dark:border-white/10 dark:bg-white/[0.06] dark:text-white/65 dark:hover:border-white/20 dark:hover:bg-white/[0.11] dark:hover:text-white',
             visibleTasks.length === 0 && 'hidden',
           )}
         >

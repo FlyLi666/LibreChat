@@ -61,9 +61,18 @@ type RawMarketItem = Omit<MarketItem, 'author' | 'icon'> & {
     openingQuestions?: string[];
     systemRole?: string;
   };
+  category?: unknown;
+  content?: unknown;
+  description?: unknown;
   icon?: unknown;
+  identifier?: unknown;
   knowledgeCount?: number;
+  name?: unknown;
   pluginCount?: number;
+  readme?: unknown;
+  skillMd?: unknown;
+  sourceUrl?: unknown;
+  systemRole?: unknown;
   url?: string;
 };
 
@@ -390,16 +399,99 @@ function normalizeAuthor(value: RawMarketItem['author']) {
   return value.name || value.userName;
 }
 
+function normalizeText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const found = value.map((item) => normalizeText(item)).find(Boolean);
+    return found || fallback;
+  }
+  if (typeof value === 'object' && value) {
+    const record = value as Record<string, unknown>;
+    const priorityKeys = [
+      'zh-CN',
+      'zh_CN',
+      'zh-Hans',
+      'zhHans',
+      'zh',
+      'cn',
+      'en-US',
+      'en_US',
+      'en',
+      'default',
+      'name',
+      'title',
+      'label',
+      'description',
+      'summary',
+    ];
+    for (const key of priorityKeys) {
+      const normalized = normalizeText(record[key]);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    const found = Object.values(record)
+      .map((item) => normalizeText(item))
+      .find(Boolean);
+    return found || fallback;
+  }
+  return fallback;
+}
+
+function normalizeOptionalText(value: unknown) {
+  const normalized = normalizeText(value);
+  return normalized || undefined;
+}
+
+function normalizeNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 function normalizeMarketItem(item: RawMarketItem): MarketItem {
+  const identifier = normalizeText(item.identifier, 'market-item');
+  const name = normalizeText(item.name, identifier);
+
   return {
     ...item,
     author: normalizeAuthor(item.author),
-    content: item.content ?? item.config?.openingMessage,
+    category: normalizeOptionalText(item.category),
+    commentCount: normalizeNumber(item.commentCount),
+    content: normalizeOptionalText(item.content ?? item.config?.openingMessage),
+    description: normalizeOptionalText(item.description),
     icon: normalizeIcon(item.icon ?? item.avatar),
+    identifier,
+    installCount: normalizeNumber(item.installCount),
+    name,
+    promptsCount: normalizeNumber(item.promptsCount),
+    ratingAvg: normalizeNumber(item.ratingAvg),
+    readme: normalizeOptionalText(item.readme),
     resourcesCount: item.resourcesCount ?? item.knowledgeCount,
-    sourceUrl: item.sourceUrl || item.url,
-    systemRole: item.systemRole ?? item.config?.systemRole,
+    skillMd: normalizeOptionalText(item.skillMd),
+    sourceUrl: normalizeOptionalText(item.sourceUrl || item.url),
+    systemRole: normalizeOptionalText(item.systemRole ?? item.config?.systemRole),
     toolsCount: item.toolsCount ?? item.pluginCount,
+    updatedAt: normalizeOptionalText(item.updatedAt),
+  };
+}
+
+function normalizeCategoryItem(item: CategoryItem): CategoryItem {
+  return {
+    ...item,
+    category: normalizeOptionalText(item.category),
+    count: normalizeNumber(item.count),
+    name: normalizeOptionalText(item.name),
   };
 }
 
@@ -441,7 +533,11 @@ export async function getMarketList(
   params: URLSearchParams,
 ): Promise<MarketListResponse<MarketItem>> {
   if (!isLocalDev() && communityDataService.getCommunityMarketItems) {
-    return communityDataService.getCommunityMarketItems(kind, paramsToObject(params));
+    const response = await communityDataService.getCommunityMarketItems(
+      kind,
+      paramsToObject(params),
+    );
+    return normalizeMarketList(response as MarketListResponse<RawMarketItem>);
   }
 
   if (!isLocalDev() && kind === 'agent') {
@@ -476,7 +572,8 @@ export async function getMarketCategories(
   locale: string,
 ): Promise<CategoryItem[]> {
   if (!isLocalDev() && communityDataService.getCommunityMarketCategories) {
-    return communityDataService.getCommunityMarketCategories(kind, { locale });
+    const categories = await communityDataService.getCommunityMarketCategories(kind, { locale });
+    return categories.map(normalizeCategoryItem);
   }
 
   if (!isLocalDev() && kind === 'agent') {
@@ -500,7 +597,10 @@ export async function getMarketDetail(
   locale: string,
 ): Promise<MarketItem | null> {
   if (!isLocalDev() && communityDataService.getCommunityMarketDetail) {
-    return communityDataService.getCommunityMarketDetail(kind, identifier, { locale });
+    const detail = await communityDataService.getCommunityMarketDetail(kind, identifier, {
+      locale,
+    });
+    return normalizeMarketItem(detail as RawMarketItem);
   }
 
   if (!isLocalDev() && kind === 'agent') {
