@@ -293,6 +293,9 @@ function ExpandedPanel({
     if (location.pathname.startsWith('/community')) {
       return 'community-market';
     }
+    if (location.pathname === '/agent/lobe-ai/channel') {
+      return 'wechat-bot';
+    }
     if (location.pathname.startsWith('/agent')) {
       return 'lobe-ai';
     }
@@ -304,7 +307,10 @@ function ExpandedPanel({
   const effectiveActive = routeActive ?? activePanelId;
   const showPanelLinks = !routeActive && !expanded;
   const showRecentConversations =
-    !routeActive || routeActive === 'home' || routeActive === 'lobe-ai';
+    !routeActive ||
+    routeActive === 'home' ||
+    routeActive === 'lobe-ai' ||
+    routeActive === 'wechat-bot';
   const showChatTools = !routeActive || routeActive === 'home' || routeActive === 'lobe-ai';
   const isNavLinkActive = useCallback(
     (link: NavLink) =>

@@ -42,7 +42,7 @@ const AttachFile = ({
             aria-label={localize('com_sidepanel_attach_files')}
             disabled={isUploadDisabled}
             className={cn(
-              'flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] p-1 text-white/75 transition-colors hover:border-white/20 hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50',
+              'flex size-9 items-center justify-center rounded-full border border-border-light bg-surface-tertiary p-1 text-text-secondary transition-colors hover:border-border-medium hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50 dark:border-white/10 dark:bg-white/[0.06] dark:text-white/75 dark:hover:border-white/20 dark:hover:bg-white/[0.12] dark:hover:text-white',
             )}
             onKeyDownCapture={(e) => {
               if (!inputRef.current) {

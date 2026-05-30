@@ -8,7 +8,6 @@ import type { ChatFormValues } from '~/common';
 import { ChatContext, ChatFormProvider, ActivePanelProvider } from '~/Providers';
 import useUnifiedSidebarLinks from '~/hooks/Nav/useUnifiedSidebarLinks';
 import { useChatHelpers, useLocalize } from '~/hooks';
-import ExpandedPanel from './ExpandedPanel';
 import Sidebar from './Sidebar';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -177,11 +176,15 @@ function UnifiedSidebar() {
         >
           <SidebarChatProvider>
             <ActivePanelProvider>
-              <ExpandedPanel
-                links={panelLinks}
+              <Sidebar
                 workspaceLinks={workspaceLinks}
                 assistantLinks={assistantLinks}
+                panelLinks={panelLinks}
+                expanded={panelExpanded}
                 onCollapse={handleCollapse}
+                onExpand={handleExpand}
+                onSecondaryPanelChange={handleSecondaryPanelChange}
+                mobile
               />
             </ActivePanelProvider>
           </SidebarChatProvider>

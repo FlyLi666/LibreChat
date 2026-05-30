@@ -379,7 +379,7 @@ const ChatForm = memo(function ChatForm({
                 />
               </div>
               <div
-                className="hidden max-w-[220px] shrink-0 sm:block [&_button:hover]:bg-surface-hover dark:[&_button:hover]:bg-white/[0.12] [&_button]:h-9 [&_button]:rounded-full [&_button]:border-border-light [&_button]:bg-surface-tertiary [&_button]:text-text-secondary dark:[&_button]:border-white/10 dark:[&_button]:bg-white/[0.07] dark:[&_button]:text-white/75"
+                className="block max-w-[46vw] shrink-0 sm:max-w-[220px] [&_button:hover]:bg-surface-hover dark:[&_button:hover]:bg-white/[0.12] [&_button]:my-0 [&_button]:h-9 [&_button]:max-w-full [&_button]:rounded-full [&_button]:border-border-light [&_button]:bg-surface-tertiary [&_button]:text-text-secondary dark:[&_button]:border-white/10 dark:[&_button]:bg-white/[0.07] dark:[&_button]:text-white/75"
                 onClick={(event) => event.preventDefault()}
               >
                 <ModelSelector startupConfig={startupConfig} />

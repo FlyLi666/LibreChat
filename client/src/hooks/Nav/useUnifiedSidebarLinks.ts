@@ -1,7 +1,15 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useNavigate } from 'react-router-dom';
-import { Boxes, FileText, Home, LibraryBig, MessagesSquare, Sparkles } from 'lucide-react';
+import {
+  Boxes,
+  BotMessageSquare,
+  FileText,
+  Home,
+  LibraryBig,
+  MessagesSquare,
+  Sparkles,
+} from 'lucide-react';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
 import type { TEndpointsConfig } from 'librechat-data-provider';
@@ -102,11 +110,19 @@ export default function useUnifiedSidebarLinks() {
       id: 'lobe-ai',
       onClick: () => navigate('/agent/lobe-ai/new'),
     };
+    const wechatBotLink: NavLink = {
+      title: 'com_nav_wechat_bot',
+      label: '',
+      icon: BotMessageSquare,
+      id: 'wechat-bot',
+      onClick: () => navigate('/agent/lobe-ai/channel'),
+    };
 
     return {
       workspaceLinks: [homeLink, imageLink, ...(docsLink ? [docsLink] : [])],
       assistantLinks: [
         lobeAiLink,
+        wechatBotLink,
         ...(agentBuilderLink
           ? [{ ...agentBuilderLink, title: 'com_nav_create_assistant' as const }]
           : []),
