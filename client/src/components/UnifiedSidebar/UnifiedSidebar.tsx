@@ -55,7 +55,7 @@ function UnifiedSidebar() {
     location.pathname === '/image' ||
     location.pathname === '/notebook' ||
     location.pathname.startsWith('/community');
-  const panelExpanded = expanded && !isFullPageRoute;
+  const panelExpanded = expanded && (!isFullPageRoute || isSmallScreen);
   const expandedMinWidth = secondaryPanelOpen ? SECONDARY_PANEL_MIN : EXPANDED_MIN;
   let maxSidebarWidth: number | string = COLLAPSED_WIDTH;
   if (panelExpanded) {
@@ -63,12 +63,12 @@ function UnifiedSidebar() {
   }
 
   useEffect(() => {
-    if (isFullPageRoute) {
+    if (isFullPageRoute && !isSmallScreen) {
       startTransition(() => {
         setExpanded(false);
       });
     }
-  }, [isFullPageRoute, setExpanded]);
+  }, [isFullPageRoute, isSmallScreen, setExpanded]);
 
   const handleCollapse = useCallback(() => {
     startTransition(() => {

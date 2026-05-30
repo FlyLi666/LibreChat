@@ -166,6 +166,11 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           prompt: '请用设计师视角拆解这个页面的结构、视觉层级和可优化点。',
           tag: '设计',
         },
+        {
+          title: '排一个小计划',
+          prompt: '把这个想法拆成今天能完成的 4 个步骤，并写清楚每一步产出。',
+          tag: '执行',
+        },
       ],
       [
         {
@@ -182,6 +187,11 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           title: '创建开发任务',
           prompt: '把这个需求拆成一个可交给工程师执行的小任务，包含验收标准。',
           tag: '开发',
+        },
+        {
+          title: '复盘今天进度',
+          prompt: '帮我把今天做过的事整理成进度、问题、明天第一步。',
+          tag: '复盘',
         },
       ],
     ],
@@ -278,25 +288,25 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
             {description}
           </div>
         )}
-        <div className="mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
+        <div className="mt-3 flex max-w-3xl flex-wrap justify-center gap-1.5 sm:mt-5 sm:gap-2">
           {chips.map((chip) => (
             <button
               key={chip}
               type="button"
               onClick={() => applyPrompt(`围绕「${chip}」给我 3 个可直接执行的建议。`)}
-              className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-sm text-white/75 transition hover:border-white/25 hover:bg-white/[0.12] hover:text-white"
+              className="rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-xs text-white/75 transition hover:border-white/25 hover:bg-white/[0.12] hover:text-white sm:px-3 sm:py-1.5 sm:text-sm"
             >
               {chip}
             </button>
           ))}
         </div>
-        <div className="mt-5 grid w-full max-w-4xl grid-cols-1 gap-3 px-1 sm:grid-cols-3">
+        <div className="mt-4 grid w-full max-w-4xl grid-cols-2 gap-2 px-1 sm:mt-5 sm:gap-3 lg:grid-cols-4">
           {visibleTasks.map((task) => (
             <div
               key={task.title}
-              className="group min-h-32 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left shadow-[0_18px_70px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.1]"
+              className="group min-h-[112px] rounded-xl border border-white/10 bg-white/[0.06] p-3 text-left shadow-[0_12px_42px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.1] sm:min-h-[124px] sm:rounded-2xl sm:p-4"
             >
-              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="mb-2 flex items-center justify-between gap-2 sm:mb-3">
                 <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60">
                   {task.tag}
                 </span>
@@ -305,16 +315,18 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
               <button
                 type="button"
                 onClick={() => applyPrompt(task.prompt)}
-                className="block w-full text-left text-sm font-medium text-white"
+                className="block w-full text-left text-xs font-medium leading-5 text-white sm:text-sm"
               >
                 {task.title}
               </button>
-              <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/50">{task.prompt}</p>
-              <div className="mt-4 flex items-center gap-2 opacity-90">
+              <p className="mt-1 hidden text-xs leading-5 text-white/50 sm:line-clamp-2 sm:block">
+                {task.prompt}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 opacity-90 sm:mt-4 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => appendPrompt(task.prompt)}
-                  className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/15 hover:text-white"
+                  className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[11px] text-white/70 transition hover:bg-white/15 hover:text-white sm:px-2.5 sm:text-xs"
                 >
                   <Plus className="size-3.5" />
                   {addTaskLabel}
@@ -326,7 +338,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
                       `请按「目标 / 背景 / 输出格式 / 验收标准」模板处理：\n${task.prompt}`,
                     )
                   }
-                  className="rounded-full px-2.5 py-1 text-xs text-white/55 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-full px-2 py-1 text-[11px] text-white/55 transition hover:bg-white/10 hover:text-white sm:px-2.5 sm:text-xs"
                 >
                   {templateLabel}
                 </button>

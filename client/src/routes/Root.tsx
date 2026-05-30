@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@librechat/client';
 import {
   useSearchEnabled,
@@ -26,10 +26,8 @@ import { Banner } from '~/components/Banners';
 export default function Root() {
   const [showTerms, setShowTerms] = useState(false);
   const [bannerHeight, setBannerHeight] = useState(0);
-  const location = useLocation();
   const sidebarExpanded = useRecoilValue(store.sidebarExpanded);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
-  const isFullPageRoute = location.pathname === '/image' || location.pathname === '/notebook';
 
   const { isAuthenticated, logout } = useAuthContext();
 
@@ -77,7 +75,7 @@ export default function Root() {
                   <UnifiedSidebar />
                   <div
                     className="relative flex h-full max-w-full flex-1 flex-col overflow-hidden"
-                    inert={isSmallScreen && sidebarExpanded && !isFullPageRoute ? '' : undefined}
+                    inert={isSmallScreen && sidebarExpanded ? '' : undefined}
                   >
                     <Outlet />
                   </div>

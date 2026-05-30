@@ -16,7 +16,6 @@ import ChatForm from './Input/ChatForm';
 import Landing from './Landing';
 import Header from './Header';
 import Footer from './Footer';
-import { cn } from '~/utils';
 import store from '~/store';
 
 function LoadingSpinner() {
@@ -86,30 +85,32 @@ function ChatView({ index = 0 }: { index?: number }) {
       <ChatContext.Provider value={chatHelpers}>
         <AddedChatContext.Provider value={addedChatHelpers}>
           <Presentation>
-            <div className="relative flex h-full w-full flex-col">
+            <div className="relative flex h-full w-full flex-col overflow-hidden">
               <Header />
-              <>
-                <div
-                  className={cn(
-                    'flex flex-col transition-colors duration-200',
-                    isLandingPage
-                      ? 'flex-1 items-center justify-end bg-[#090b10] px-3 pt-14 text-white sm:justify-center'
-                      : 'h-full overflow-y-auto',
-                  )}
-                >
-                  {content}
-                  <div
-                    className={cn(
-                      'w-full',
-                      isLandingPage && 'max-w-4xl transition-all duration-200 xl:max-w-5xl',
-                    )}
-                  >
-                    <ChatForm index={index} />
-                    {isLandingPage ? <ConversationStarters /> : <Footer />}
+              {isLandingPage ? (
+                <>
+                  <div className="flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto bg-[#090b10] px-3 pt-14 text-white transition-colors duration-200 sm:justify-center">
+                    {content}
                   </div>
-                </div>
-                {isLandingPage && <Footer />}
-              </>
+                  <div className="shrink-0 bg-[#090b10] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+                    <div className="mx-auto w-full max-w-4xl transition-all duration-200 xl:max-w-5xl">
+                      <ChatForm index={index} />
+                      <ConversationStarters />
+                    </div>
+                  </div>
+                  <Footer />
+                </>
+              ) : (
+                <>
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden transition-colors duration-200">
+                    {content}
+                  </div>
+                  <div className="shrink-0 bg-surface-primary px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+                    <ChatForm index={index} />
+                    <Footer />
+                  </div>
+                </>
+              )}
             </div>
           </Presentation>
         </AddedChatContext.Provider>
