@@ -1,13 +1,17 @@
 import React from 'react';
 import { RecoilRoot } from 'recoil';
 import '@testing-library/jest-dom/extend-expect';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import NotebookPage from '../NotebookPage';
 
-const mockUseGetStartupConfig = jest.fn();
+const mockGetHeziNotebookSession = jest.fn();
 
-jest.mock('~/data-provider', () => ({
-  useGetStartupConfig: () => mockUseGetStartupConfig(),
+jest.mock('librechat-data-provider', () => ({
+  ...jest.requireActual('librechat-data-provider'),
+  dataService: {
+    ...jest.requireActual('librechat-data-provider').dataService,
+    getHeziNotebookSession: () => mockGetHeziNotebookSession(),
+  },
 }));
 
 jest.mock('~/hooks', () => ({
@@ -31,40 +35,56 @@ describe('NotebookPage', () => {
     jest.clearAllMocks();
   });
 
-  it('embeds the configured NotebookLM URL', () => {
-    mockUseGetStartupConfig.mockReturnValue({
-      data: { notebookLmUrl: 'https://notebook.example.com' },
+  it('loads NotebookLM through a HeZi session URL', async () => {
+    mockGetHeziNotebookSession.mockResolvedValue({
+      url: 'https://notebook.example.com/api/auth/hezi/start?token=abc',
+      expiresAt: 1,
     });
 
     renderPage();
 
-    expect(screen.getByTitle('NotebookLM')).toHaveAttribute('src', 'https://notebook.example.com');
+    await waitFor(() =>
+      expect(screen.getByTitle('NotebookLM')).toHaveAttribute(
+        'src',
+        'https://notebook.example.com/api/auth/hezi/start?token=abc',
+      ),
+    );
   });
 
-  it('falls back to the production NotebookLM URL', () => {
-    mockUseGetStartupConfig.mockReturnValue({ data: {} });
-
-    renderPage();
-
-    expect(screen.getByTitle('NotebookLM')).toHaveAttribute('src', 'https://notebook.flyli.cn');
-  });
-
-  it('renders a mobile-safe sidebar opener', () => {
-    mockUseGetStartupConfig.mockReturnValue({ data: {} });
+  it('renders a mobile-safe sidebar opener', async () => {
+    mockGetHeziNotebookSession.mockResolvedValue({
+      url: 'https://notebook.example.com',
+      expiresAt: 1,
+    });
 
     renderPage();
 
     expect(screen.getByTestId('open-sidebar-button')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'NotebookLM' })).toBeInTheDocument();
+    await screen.findByTitle('NotebookLM');
   });
 
   it('shows a loading state until the iframe loads', () => {
-    mockUseGetStartupConfig.mockReturnValue({ data: {} });
+    mockGetHeziNotebookSession.mockResolvedValue({
+      url: 'https://notebook.example.com',
+      expiresAt: 1,
+    });
 
     renderPage();
 
     expect(screen.getByTestId('notebook-loading')).toBeInTheDocument();
-    fireEvent.load(screen.getByTitle('NotebookLM'));
+    return waitFor(() => expect(screen.getByTitle('NotebookLM')).toBeInTheDocument()).then(() => {
+      fireEvent.load(screen.getByTitle('NotebookLM'));
+      expect(screen.queryByTestId('notebook-loading')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows an error when the HeZi session cannot be created', async () => {
+    mockGetHeziNotebookSession.mockRejectedValue(new Error('NotebookLM SSO is not configured'));
+
+    renderPage();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('NotebookLM SSO is not configured');
     expect(screen.queryByTestId('notebook-loading')).not.toBeInTheDocument();
   });
 });

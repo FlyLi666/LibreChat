@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import {
   Login,
-  RequireAdmin,
   VerifyEmail,
   Registration,
   ResetPassword,
@@ -176,11 +175,6 @@ export const router = createBrowserRouter(
             },
             {
               path: 'notebook',
-              element: (
-                <RequireAdmin>
-                  <Outlet />
-                </RequireAdmin>
-              ),
               children: [
                 {
                   index: true,

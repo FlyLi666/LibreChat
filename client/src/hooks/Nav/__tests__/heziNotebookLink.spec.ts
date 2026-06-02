@@ -2,13 +2,9 @@ import { SystemRoles } from 'librechat-data-provider';
 import { createHeziNotebookLink } from '../heziNotebookLink';
 
 describe('createHeziNotebookLink', () => {
-  it('returns no link for normal users', () => {
-    expect(createHeziNotebookLink(SystemRoles.USER, jest.fn())).toBeNull();
-  });
-
-  it('returns a NotebookLM navigation link for admins', () => {
+  it('returns a NotebookLM navigation link for signed-in users', () => {
     const navigate = jest.fn();
-    const link = createHeziNotebookLink(SystemRoles.ADMIN, navigate);
+    const link = createHeziNotebookLink(SystemRoles.USER, navigate);
 
     expect(link).toMatchObject({
       id: 'notebook',

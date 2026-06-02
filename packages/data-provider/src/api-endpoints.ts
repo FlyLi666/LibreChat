@@ -306,6 +306,7 @@ export const imageBatch = (batchId: string) => `${imageGeneration()}/batches/${b
 export const imageGenerate = () => `${imageGeneration()}/generate`;
 export const imageGenerationItem = (generationId: string) =>
   `${imageGeneration()}/generations/${generationId}`;
+export const heziNotebookSession = () => `${BASE_URL}/api/hezi/notebook-session`;
 
 export const speech = () => `${files()}/speech`;
 

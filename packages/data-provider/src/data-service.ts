@@ -150,6 +150,10 @@ export function getImageModels(): Promise<{ models: t.TImageModel[] }> {
   return request.get(endpoints.imageModels());
 }
 
+export function getHeziNotebookSession(): Promise<{ url: string; expiresAt: number }> {
+  return request.get(endpoints.heziNotebookSession());
+}
+
 export function getImageTopics(): Promise<{ topics: t.TImageTopic[] }> {
   return request.get(endpoints.imageTopics());
 }
