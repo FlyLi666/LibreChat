@@ -1087,6 +1087,7 @@ export type TStartupConfig = {
   serverDomain: string;
   emailLoginEnabled: boolean;
   registrationEnabled: boolean;
+  heziRequireInviteCode?: boolean;
   socialLoginEnabled: boolean;
   passwordResetEnabled: boolean;
   emailEnabled: boolean;

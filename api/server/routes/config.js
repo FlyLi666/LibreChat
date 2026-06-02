@@ -75,6 +75,7 @@ function buildSharedPayload() {
     serverDomain: process.env.DOMAIN_SERVER || 'http://localhost:3080',
     emailLoginEnabled,
     registrationEnabled: !ldap?.enabled && isEnabled(process.env.ALLOW_REGISTRATION),
+    heziRequireInviteCode: isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE),
     socialLoginEnabled: isEnabled(process.env.ALLOW_SOCIAL_LOGIN),
     emailEnabled:
       (!!process.env.EMAIL_SERVICE || !!process.env.EMAIL_HOST) &&

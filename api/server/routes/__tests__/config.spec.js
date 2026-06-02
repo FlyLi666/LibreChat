@@ -83,6 +83,7 @@ afterEach(() => {
   delete process.env.SANDPACK_STATIC_BUNDLER_URL;
   delete process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES;
   delete process.env.ALLOW_REGISTRATION;
+  delete process.env.HEZI_REQUIRE_INVITE_CODE;
   delete process.env.ALLOW_SOCIAL_LOGIN;
   delete process.env.ALLOW_PASSWORD_RESET;
   delete process.env.DOMAIN_SERVER;
@@ -206,6 +207,16 @@ describe('GET /api/config', () => {
       expect(response.body.appTitle).toBe('Test App');
       expect(response.body).toHaveProperty('emailLoginEnabled');
       expect(response.body).toHaveProperty('serverDomain');
+    });
+
+    it('should expose whether HeZi invite codes are required', async () => {
+      mockGetAppConfig.mockResolvedValue(baseAppConfig);
+      process.env.HEZI_REQUIRE_INVITE_CODE = 'true';
+      const app = createApp(null);
+
+      const response = await request(app).get('/api/config');
+
+      expect(response.body.heziRequireInviteCode).toBe(true);
     });
 
     it('should include the configured NotebookLM URL', async () => {

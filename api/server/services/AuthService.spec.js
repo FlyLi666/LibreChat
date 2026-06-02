@@ -497,6 +497,7 @@ describe('registerUser HeZi provisioning', () => {
     } else {
       process.env.HEZI_REQUIRE_INVITE_CODE = originalRequireInvite;
     }
+    delete process.env.HEZI_NEWAPI_ADMIN_TOKEN;
   });
 
   it('keeps the LibreChat user and records a retryable error when NewAPI provisioning fails after registration', async () => {
@@ -530,6 +531,33 @@ describe('registerUser HeZi provisioning', () => {
       step: 'registration',
       error: provisioningError,
     });
+  });
+
+  it('provisions a NewAPI shadow account when invite codes are disabled', async () => {
+    process.env.HEZI_REQUIRE_INVITE_CODE = 'false';
+    process.env.HEZI_NEWAPI_ADMIN_TOKEN = 'admin-token';
+    provisionShadowAccount.mockResolvedValue({
+      newapiUserId: 12,
+      redeemed: false,
+      sk: 'sk-test',
+    });
+
+    const result = await registerUser({
+      email: 'teacher@example.com',
+      password: 'correct horse battery staple',
+      name: 'Teacher',
+      username: 'teacher',
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      message: 'Please check your email to verify your email address.',
+    });
+    expect(provisionShadowAccount).toHaveBeenCalledWith({
+      user: expect.objectContaining({ _id: 'user-123' }),
+      quotaCode: undefined,
+    });
+    expect(consumeInviteCode).not.toHaveBeenCalled();
   });
 });
 

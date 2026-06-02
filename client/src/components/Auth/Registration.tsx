@@ -36,6 +36,7 @@ const Registration: React.FC = () => {
 
   // only require captcha if we have a siteKey
   const requireCaptcha = Boolean(startupConfig?.turnstile?.siteKey);
+  const requireInviteCode = startupConfig?.heziRequireInviteCode === true;
 
   const registerUser = useRegisterUserMutation({
     onMutate: () => {
@@ -179,19 +180,20 @@ const Registration: React.FC = () => {
                 value === password || localize('com_auth_password_not_match'),
             })}
 
-            {renderInput('inviteCode', 'com_auth_invite_code', 'text', {
-              required: localize('com_auth_invite_code_required'),
-              minLength: {
-                value: 4,
-                message: localize('com_auth_invite_code_invalid'),
-              },
-              maxLength: {
-                value: 64,
-                message: localize('com_auth_invite_code_invalid'),
-              },
-              setValueAs: (value: string) =>
-                typeof value === 'string' ? value.trim().toUpperCase() : value,
-            })}
+            {requireInviteCode &&
+              renderInput('inviteCode', 'com_auth_invite_code', 'text', {
+                required: localize('com_auth_invite_code_required'),
+                minLength: {
+                  value: 4,
+                  message: localize('com_auth_invite_code_invalid'),
+                },
+                maxLength: {
+                  value: 64,
+                  message: localize('com_auth_invite_code_invalid'),
+                },
+                setValueAs: (value: string) =>
+                  typeof value === 'string' ? value.trim().toUpperCase() : value,
+              })}
 
             {startupConfig?.turnstile?.siteKey && (
               <div className="my-4 flex justify-center">

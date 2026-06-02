@@ -53,6 +53,14 @@ const domains = {
 const genericVerificationMessage = 'Please check your email to verify your email address.';
 const OPENID_SESSION_ID_TOKEN_EXPIRY_BUFFER_SECONDS = 30;
 
+function shouldProvisionHeziShadowAccounts() {
+  return (
+    isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE) ||
+    isEnabled(process.env.HEZI_ENABLE_SHADOW_PROVISIONING) ||
+    !!process.env.HEZI_NEWAPI_ADMIN_TOKEN
+  );
+}
+
 const getUnexpiredOpenIDSessionIdToken = (idToken) => {
   if (!idToken) {
     return;
@@ -265,20 +273,22 @@ const registerUser = async (user, additionalData = {}) => {
     const newUser = await createUser(newUserData, appConfig.balance, disableTTL, true);
     newUserId = newUser._id;
 
-    // === HeZi: provision NewAPI shadow account + consume invite code ===
-    // Only runs when invite-code feature is on AND middleware attached one.
-    // (heziInvite was destructured out of additionalData above.)
-    if (isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE) && heziInvite) {
+    // === HeZi: provision NewAPI shadow account + optionally consume invite code ===
+    // The shadow account is required for HeZi model access even when invite codes are disabled.
+    // If an invite was attached, consume it only after provisioning succeeds.
+    if (shouldProvisionHeziShadowAccounts()) {
       try {
         await provisionShadowAccount({
           user: newUser,
-          quotaCode: heziInvite.quotaCode,
+          quotaCode: heziInvite?.quotaCode,
         });
-        // Atomic consume — succeeds for exactly one concurrent caller.
-        const consumed = await consumeInviteCode(heziInvite.code, newUser._id);
-        if (!consumed) {
-          // Race lost (someone else used the same code first). Roll back.
-          throw new Error('INVITE_CODE_RACE_LOST');
+        if (heziInvite) {
+          // Atomic consume — succeeds for exactly one concurrent caller.
+          const consumed = await consumeInviteCode(heziInvite.code, newUser._id);
+          if (!consumed) {
+            // Race lost (someone else used the same code first). Roll back.
+            throw new Error('INVITE_CODE_RACE_LOST');
+          }
         }
       } catch (provisionErr) {
         await rollbackShadowAccount(newUserId);

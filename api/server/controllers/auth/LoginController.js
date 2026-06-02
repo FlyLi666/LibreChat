@@ -24,8 +24,16 @@ const recordFallbackError = async (userId, error, step = 'login_fallback') => {
   }
 };
 
+function shouldProvisionHeziShadowAccounts() {
+  return (
+    isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE) ||
+    isEnabled(process.env.HEZI_ENABLE_SHADOW_PROVISIONING) ||
+    !!process.env.HEZI_NEWAPI_ADMIN_TOKEN
+  );
+}
+
 const ensureHeziShadowAccount = async (user) => {
-  if (!isEnabled(process.env.HEZI_REQUIRE_INVITE_CODE)) {
+  if (!shouldProvisionHeziShadowAccounts()) {
     return;
   }
   const userId = user._id.toString();

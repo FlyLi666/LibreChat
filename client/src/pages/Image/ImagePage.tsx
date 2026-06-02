@@ -171,6 +171,26 @@ function formatImageBatchTime(batch: TImageBatch) {
   )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
+function isLargeImageParams(params: Params | undefined) {
+  const size = String(params?.size || params?.resolution || '');
+  return size.includes('2160x3840') || size.includes('3840x2160') || size.toUpperCase() === '4K';
+}
+
+function getGenerationElapsedTime(
+  generation: TImageBatch['generations'][number],
+  localize: ReturnType<typeof useLocalize>,
+) {
+  const startedAt = generation.createdAt ? new Date(generation.createdAt).getTime() : 0;
+  if (!Number.isFinite(startedAt) || startedAt <= 0) {
+    return localize('com_image_wait_less_than_minute');
+  }
+  const minutes = Math.floor(Math.max(Date.now() - startedAt, 0) / 60_000);
+  if (minutes < 1) {
+    return localize('com_image_wait_less_than_minute');
+  }
+  return localize('com_image_wait_minutes', { count: minutes });
+}
+
 function supportsReferenceImages(model: TImageModel | undefined) {
   return (model?.paramSchemas ?? []).some(
     (schema) =>
@@ -621,6 +641,7 @@ function GenerationCard({
   const [hoveredGenerationId, setHoveredGenerationId] = useState<string | null>(null);
   const batchTime = formatImageBatchTime(batch);
   const imageCount = batch.generations.length;
+  const isLargeImageBatch = isLargeImageParams(batch.params as Params | undefined);
 
   const copyPrompt = async () => {
     try {
@@ -696,7 +717,11 @@ function GenerationCard({
                   size="icon"
                   variant="ghost"
                   className="size-7"
-                  aria-label={localize('com_image_action_delete')}
+                  aria-label={
+                    generation.status === 'pending'
+                      ? localize('com_image_action_cancel')
+                      : localize('com_image_action_delete')
+                  }
                   disabled={deleting}
                   onClick={() => onDeleteGeneration(generation._id)}
                 >
@@ -704,8 +729,37 @@ function GenerationCard({
                 </Button>
               </div>
               {generation.status === 'pending' && (
-                <div className="flex h-full items-center justify-center text-sm text-text-secondary">
-                  {localize('com_image_generating')}
+                <div className="flex h-full flex-col items-center justify-center gap-4 px-5 text-center text-sm text-text-secondary">
+                  <div className="flex size-12 items-center justify-center rounded-full bg-surface-primary shadow-sm">
+                    <Sparkles className="h-5 w-5 animate-pulse text-text-primary" />
+                  </div>
+                  <div className="grid gap-1">
+                    <div className="text-base font-semibold text-text-primary">
+                      {localize('com_image_generating_title')}
+                    </div>
+                    <div className="text-xs text-text-tertiary">
+                      {localize('com_image_generating_waited', {
+                        time: getGenerationElapsedTime(generation, localize),
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex w-full max-w-[220px] items-center justify-center gap-1.5 text-xs font-medium text-text-tertiary">
+                    {[
+                      localize('com_image_generating_step_queue'),
+                      localize('com_image_generating_step_generate'),
+                      localize('com_image_generating_step_save'),
+                    ].map((step, index) => (
+                      <div key={step} className="flex min-w-0 items-center gap-1.5">
+                        {index > 0 ? <span className="h-px w-3 bg-border-light" /> : null}
+                        <span className="rounded-full bg-surface-primary px-2 py-1">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {isLargeImageBatch ? (
+                    <div className="max-w-[260px] text-xs leading-5 text-text-tertiary">
+                      {localize('com_image_generating_4k_hint')}
+                    </div>
+                  ) : null}
                 </div>
               )}
               {generation.status === 'failed' && (
@@ -717,6 +771,15 @@ function GenerationCard({
                   <div className="font-mono text-sm text-text-tertiary">
                     {generation.error || localize('com_image_error_no_channel')}
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={generating}
+                    onClick={() => onRecreateBatch(batch)}
+                  >
+                    <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                    {localize('com_image_action_recreate')}
+                  </Button>
                 </div>
               )}
               {imageUrl && (
@@ -829,6 +892,7 @@ function PromptComposer({
   const [configOpen, setConfigOpen] = useState(false);
   const paramSchemas = (model?.paramSchemas ?? []).filter((schema) => schema.name !== 'imageUrls');
   const disabled = !prompt.trim() || generating || uploading;
+  const isLargeImageSelected = isLargeImageParams(params);
 
   return (
     <div className="mx-auto w-full max-w-[1050px] rounded-2xl border border-border-light bg-surface-primary p-2 shadow-[0_8px_28px_rgba(0,0,0,0.06)]">
@@ -914,6 +978,11 @@ function PromptComposer({
                   onChange={(value) => onParamChange(schema.name, value)}
                 />
               ))}
+              {isLargeImageSelected ? (
+                <div className="rounded-xl bg-surface-tertiary px-3 py-2 text-xs leading-5 text-text-tertiary">
+                  {localize('com_image_composer_4k_hint')}
+                </div>
+              ) : null}
             </div>
           )}
         </div>

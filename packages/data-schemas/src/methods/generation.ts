@@ -280,6 +280,57 @@ export function createGenerationMethods(mongoose: typeof import('mongoose')) {
       .lean<IGeneration>();
   }
 
+  async function getActivePendingGeneration({
+    userId,
+    generationId,
+  }: {
+    userId: ObjectIdLike;
+    generationId: ObjectIdLike;
+  }): Promise<IGeneration | null> {
+    return generations()
+      .findOne({
+        _id: generationId,
+        userId,
+        status: 'pending',
+        deletedAt: { $exists: false },
+      })
+      .lean<IGeneration>();
+  }
+
+  async function countPendingGenerationsForUser({
+    userId,
+  }: {
+    userId: ObjectIdLike;
+  }): Promise<number> {
+    return generations().countDocuments({
+      userId,
+      status: 'pending',
+      deletedAt: { $exists: false },
+    });
+  }
+
+  async function markStalePendingGenerationsFailed({
+    olderThan,
+    error,
+  }: {
+    olderThan: Date;
+    error: string;
+  }) {
+    return generations().updateMany(
+      {
+        status: 'pending',
+        deletedAt: { $exists: false },
+        createdAt: { $lt: olderThan },
+      },
+      {
+        $set: {
+          status: 'failed',
+          error: error.slice(0, 2048),
+        },
+      },
+    );
+  }
+
   async function deleteGenerationBatch({
     userId,
     batchId,
@@ -303,10 +354,21 @@ export function createGenerationMethods(mongoose: typeof import('mongoose')) {
     userId: ObjectIdLike;
     generationId: ObjectIdLike;
   }): Promise<IGeneration | null> {
+    const generation = await generations()
+      .findOne({ _id: generationId, userId, deletedAt: { $exists: false } })
+      .lean<IGeneration>();
+    if (!generation) {
+      return null;
+    }
+    const $set: Record<string, unknown> = { deletedAt: new Date() };
+    if (generation.status === 'pending') {
+      $set.status = 'failed';
+      $set.error = '用户已取消';
+    }
     return generations()
       .findOneAndUpdate(
         { _id: generationId, userId, deletedAt: { $exists: false } },
-        { $set: { deletedAt: new Date() } },
+        { $set },
         { new: true },
       )
       .lean<IGeneration>();
@@ -323,6 +385,9 @@ export function createGenerationMethods(mongoose: typeof import('mongoose')) {
     listPendingGenerationBatches,
     markGenerationSucceeded,
     markGenerationFailed,
+    getActivePendingGeneration,
+    countPendingGenerationsForUser,
+    markStalePendingGenerationsFailed,
     deleteGenerationBatch,
     deleteGeneration,
   };

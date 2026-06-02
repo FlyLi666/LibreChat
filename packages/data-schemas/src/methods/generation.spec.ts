@@ -141,6 +141,127 @@ describe('generation methods', () => {
     expect(batches[0].generations).toHaveLength(0);
   });
 
+  it('marks pending generations as cancelled before hiding them', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const topic = await methods.createGenerationTopic({ userId, title: '主题', type: 'image' });
+    const batch = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+      params: {},
+      imageNum: 1,
+    });
+
+    const deleted = await methods.deleteGeneration({ userId, generationId: batch.generations[0]._id });
+
+    expect(deleted).toMatchObject({
+      status: 'failed',
+      error: '用户已取消',
+    });
+    expect(deleted?.deletedAt).toBeTruthy();
+  });
+
+  it('finds only active pending generations for background jobs', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const topic = await methods.createGenerationTopic({ userId, title: '主题', type: 'image' });
+    const batch = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+      params: {},
+      imageNum: 2,
+    });
+    await methods.markGenerationSucceeded({
+      userId,
+      generationId: batch.generations[1]._id,
+      asset: { url: '/images/user/done.png' },
+    });
+
+    const active = await methods.getActivePendingGeneration({
+      userId,
+      generationId: batch.generations[0]._id,
+    });
+    const completed = await methods.getActivePendingGeneration({
+      userId,
+      generationId: batch.generations[1]._id,
+    });
+
+    expect(active?._id).toEqual(batch.generations[0]._id);
+    expect(completed).toBeNull();
+  });
+
+  it('counts active pending generations for a user', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const topic = await methods.createGenerationTopic({ userId, title: '主题', type: 'image' });
+    const batch = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+      params: {},
+      imageNum: 3,
+    });
+    await methods.markGenerationFailed({
+      userId,
+      generationId: batch.generations[0]._id,
+      error: 'failed',
+    });
+
+    await expect(methods.countPendingGenerationsForUser({ userId })).resolves.toBe(2);
+  });
+
+  it('marks stale pending generations failed before recovery', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const topic = await methods.createGenerationTopic({ userId, title: '主题', type: 'image' });
+    const stale = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'stale',
+      params: {},
+      imageNum: 1,
+    });
+    const fresh = await methods.createGenerationBatchWithGenerations({
+      userId,
+      topicId: topic._id,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      prompt: 'fresh',
+      params: {},
+      imageNum: 1,
+    });
+    await mongoose.models.Generation.collection.updateOne(
+      { _id: stale.generations[0]._id },
+      { $set: { createdAt: new Date('2026-05-30T00:00:00.000Z') } },
+    );
+    await mongoose.models.Generation.collection.updateOne(
+      { _id: fresh.generations[0]._id },
+      { $set: { createdAt: new Date('2026-05-30T00:10:00.000Z') } },
+    );
+
+    const result = await methods.markStalePendingGenerationsFailed({
+      olderThan: new Date('2026-05-30T00:05:00.000Z'),
+      error: '生成任务超时，请重试',
+    });
+
+    expect(result.modifiedCount).toBe(1);
+    const batches = await methods.listGenerationBatches({ userId, topicId: topic._id });
+    const staleGeneration = batches
+      .flatMap((batch) => batch.generations)
+      .find((generation) => String(generation._id) === String(stale.generations[0]._id));
+    const freshGeneration = batches
+      .flatMap((batch) => batch.generations)
+      .find((generation) => String(generation._id) === String(fresh.generations[0]._id));
+    expect(staleGeneration).toMatchObject({ status: 'failed', error: '生成任务超时，请重试' });
+    expect(freshGeneration).toMatchObject({ status: 'pending' });
+  });
+
   it('soft deletes batches without returning them in topic feeds', async () => {
     const userId = new mongoose.Types.ObjectId();
     const topic = await methods.createGenerationTopic({ userId, title: '主题', type: 'image' });

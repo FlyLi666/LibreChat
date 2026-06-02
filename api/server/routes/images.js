@@ -11,6 +11,8 @@ const { persistGeneratedImageAsset } = require('~/server/services/hezi/ImageAsse
 
 const router = express.Router();
 const queuedImageBatchIds = new Set();
+const DEFAULT_MAX_ACTIVE_GENERATIONS_PER_USER = 4;
+const DEFAULT_PENDING_TIMEOUT_MS = 10 * 60 * 1000;
 
 router.use(requireJwtAuth);
 router.use(configMiddleware);
@@ -57,6 +59,40 @@ function makeImageParamError(message) {
   const error = new Error(message);
   error.code = 'IMAGE_PARAM_INVALID';
   return error;
+}
+
+function getMaxActiveGenerationsPerUser() {
+  const parsed = Number(process.env.HEZI_IMAGE_MAX_ACTIVE_GENERATIONS_PER_USER);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_MAX_ACTIVE_GENERATIONS_PER_USER;
+  }
+  return Math.floor(parsed);
+}
+
+function getPendingTimeoutMs() {
+  const parsed = Number(process.env.HEZI_IMAGE_PENDING_TIMEOUT_MS);
+  if (!Number.isFinite(parsed) || parsed < 30_000) {
+    return DEFAULT_PENDING_TIMEOUT_MS;
+  }
+  return Math.floor(parsed);
+}
+
+function mapImageGenerationError(error) {
+  const message = String(error?.message || error || '').trim();
+  const lower = message.toLowerCase();
+  if (lower.includes('overloaded') || lower.includes('cpu')) {
+    return '服务器正在处理其他图片，请稍后重试';
+  }
+  if (lower.includes('timeout') || lower.includes('timed out') || error?.name === 'TimeoutError') {
+    return '生成超时，请稍后重试';
+  }
+  if (lower.includes('no_user_key') || lower.includes('user key')) {
+    return '当前账号还没有可用的生图密钥';
+  }
+  if (lower.includes('model') && (lower.includes('not found') || lower.includes('disabled'))) {
+    return '当前生图模型暂不可用，请换一个模型';
+  }
+  return message || '当前模型暂不可用';
 }
 
 function validateParamValue({ schema, value }) {
@@ -176,6 +212,16 @@ async function runImageGenerationJob({
     });
     const updated = [];
     for (let i = 0; i < created.generations.length; i++) {
+      const activeGeneration = await db.getActivePendingGeneration?.({
+        userId,
+        generationId: created.generations[i]._id,
+      });
+      if (!activeGeneration) {
+        logger.info(
+          `[HeZiImageGeneration] skip cancelled generation ${created.generations[i]._id}`,
+        );
+        continue;
+      }
       const image = images[i] || images[0];
       const { asset, fileId } = await persistGeneratedImageAsset({
         req,
@@ -197,11 +243,12 @@ async function runImageGenerationJob({
     }
   } catch (error) {
     logger.error('[HeZiImageGeneration] generate failed', error);
+    const friendlyError = mapImageGenerationError(error);
     for (const generation of created.generations) {
       await db.markGenerationFailed({
         userId,
         generationId: generation._id,
-        error: error.message || '当前模型暂不可用',
+        error: friendlyError,
       });
     }
   }
@@ -230,6 +277,10 @@ function queueImageGenerationJob(params) {
 }
 
 async function recoverPendingImageGenerationJobs({ appConfig, limit = 25 } = {}) {
+  await db.markStalePendingGenerationsFailed?.({
+    olderThan: new Date(Date.now() - getPendingTimeoutMs()),
+    error: '生成任务超时，请重试',
+  });
   const pendingBatches = await db.listPendingGenerationBatches({ limit });
   let queued = 0;
   for (const batch of pendingBatches) {
@@ -342,6 +393,18 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: error.code, message: error.message });
     }
     throw error;
+  }
+
+  const activeGenerationCount = await db.countPendingGenerationsForUser?.({ userId });
+  const maxActiveGenerations = getMaxActiveGenerationsPerUser();
+  if (
+    typeof activeGenerationCount === 'number' &&
+    activeGenerationCount + imageNum > maxActiveGenerations
+  ) {
+    return res.status(429).json({
+      error: 'IMAGE_GENERATION_BUSY',
+      message: '已有图片正在生成，请等待完成后再提交',
+    });
   }
 
   let topicId = req.body?.topicId;

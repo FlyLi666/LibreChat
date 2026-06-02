@@ -29,6 +29,7 @@ jest.mock('~/hooks', () => ({
         com_image_prompt_placeholder: '描述你想要生成的内容',
         com_image_generate: '生成',
         com_image_action_delete: '删除',
+        com_image_action_cancel: '取消',
         com_image_action_download: '下载',
         com_image_action_recreate: '重新生成',
         com_image_action_zoom: '放大查看',
@@ -44,6 +45,15 @@ jest.mock('~/hooks', () => ({
         com_image_empty_topic: '这个主题还没有图片，继续描述你想生成的内容',
         com_image_generation_failed_hint: '生成遇到了问题。你可以重试，或调整描述后再试',
         com_image_generating: '生成中...',
+        com_image_generating_title: '正在生成图片',
+        com_image_generating_step_queue: '排队',
+        com_image_generating_step_generate: '生成',
+        com_image_generating_step_save: '保存',
+        com_image_generating_waited: '已等待 {{time}}',
+        com_image_wait_less_than_minute: '不到 1 分钟',
+        com_image_wait_minutes: '{{count}} 分钟',
+        com_image_generating_4k_hint: '4K 图通常需要 2-4 分钟，请保持页面打开',
+        com_image_composer_4k_hint: '4K 分辨率会更慢，通常需要 2-4 分钟',
         com_image_mode_image: '图片',
         com_image_open_sidebar: '打开图片侧栏',
         com_image_open_topics: '打开图片主题',
@@ -84,7 +94,12 @@ jest.mock('~/data-provider/Images', () => ({
         displayName: 'GPT Image 2',
         paramSchemas: [
           { name: 'imageUrls', type: 'images', default: [], maxCount: 1 },
-          { name: 'size', type: 'enum', default: '1024x1024', enum: ['1024x1024'] },
+          {
+            name: 'size',
+            type: 'enum',
+            default: '1024x1024',
+            enum: ['1024x1024', '2160x3840'],
+          },
           { name: 'quality', type: 'enum', default: 'standard', enum: ['standard', 'hd'] },
           { name: 'imageNum', type: 'number', default: 1, min: 1, max: 4, step: 1 },
         ],
@@ -515,6 +530,48 @@ describe('ImagePage', () => {
       expect(screen.queryByAltText('画一只穿宇航服的猫')).not.toBeInTheDocument();
     });
     expect(screen.getByText('即刻创作')).toBeInTheDocument();
+  });
+
+  it('shows a long-running status and cancel action for pending 4K generations', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-30T10:03:20.000Z'));
+    mockTopics = [{ _id: 'topic-1', title: '赛博朋克少女', type: 'image' }];
+    mockBatches = [
+      {
+        _id: 'batch-1',
+        topicId: 'topic-1',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        prompt: '赛博朋克少女',
+        params: { size: '2160x3840' },
+        generations: [
+          {
+            _id: 'generation-1',
+            status: 'pending',
+            createdAt: '2026-05-30T10:00:00.000Z',
+          },
+        ],
+      },
+    ];
+
+    renderPage('/image?topic=topic-1');
+
+    expect(screen.getByText('正在生成图片')).toBeInTheDocument();
+    expect(screen.getByText('排队')).toBeInTheDocument();
+    expect(screen.getByText('生成')).toBeInTheDocument();
+    expect(screen.getByText('保存')).toBeInTheDocument();
+    expect(screen.getByText('已等待 3 分钟')).toBeInTheDocument();
+    expect(screen.getByText('4K 图通常需要 2-4 分钟，请保持页面打开')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  it('shows a 4K wait hint in the composer when selecting a 4K size', () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: '图像参数' }));
+    fireEvent.change(screen.getByLabelText('尺寸'), { target: { value: '2160x3840' } });
+
+    expect(screen.getByText('4K 分辨率会更慢，通常需要 2-4 分钟')).toBeInTheDocument();
   });
 
   it('keeps the composer outside the history scroll when generations exist', () => {

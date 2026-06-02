@@ -59,6 +59,7 @@ describe('loginController - HeZi shadow account fallback', () => {
 
   afterEach(() => {
     delete process.env.HEZI_REQUIRE_INVITE_CODE;
+    delete process.env.HEZI_NEWAPI_ADMIN_TOKEN;
   });
 
   it('provisions a missing shadow account before issuing auth tokens', async () => {
@@ -108,6 +109,26 @@ describe('loginController - HeZi shadow account fallback', () => {
       step: 'login_fallback',
       error,
     });
+    expect(mockSetAuthTokens).toHaveBeenCalledWith(req.user._id, res, null, req);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('provisions a missing shadow account when invite codes are disabled but NewAPI is configured', async () => {
+    process.env.HEZI_REQUIRE_INVITE_CODE = 'false';
+    process.env.HEZI_NEWAPI_ADMIN_TOKEN = 'admin-token';
+    mockHasShadowAccount.mockResolvedValue(false);
+    const req = {
+      user: {
+        _id: { toString: () => '66554433221100ffeeddccbb' },
+        email: 'teacher@example.com',
+      },
+    };
+    const res = createRes();
+
+    await loginController(req, res);
+
+    expect(mockHasShadowAccount).toHaveBeenCalledWith('66554433221100ffeeddccbb');
+    expect(mockProvisionShadowAccount).toHaveBeenCalledWith({ user: req.user });
     expect(mockSetAuthTokens).toHaveBeenCalledWith(req.user._id, res, null, req);
     expect(res.status).toHaveBeenCalledWith(200);
   });

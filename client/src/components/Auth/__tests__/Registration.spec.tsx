@@ -83,7 +83,7 @@ const setup = ({
   const mockUseOutletContext = jest.spyOn(reactRouter, 'useOutletContext').mockReturnValue({
     startupConfig: useGetStartupConfigReturnValue.data,
   });
-  const mockUseGetBannerQuery = jest
+  jest
     .spyOn(miscDataProvider, 'useGetBannerQuery')
     //@ts-ignore - we don't need all parameters of the QueryObserverSuccessResult
     .mockReturnValue(useGetBannerQueryReturnValue);
@@ -154,6 +154,26 @@ test('renders registration form', () => {
     'href',
     'mock-server/oauth/saml',
   );
+});
+
+test('hides invite code input when HeZi invite codes are not required', () => {
+  setup();
+
+  expect(screen.queryByTestId('inviteCode')).not.toBeInTheDocument();
+});
+
+test('shows invite code input when HeZi invite codes are required', () => {
+  setup({
+    useGetStartupConfigReturnValue: {
+      ...mockStartupConfig,
+      data: {
+        ...mockStartupConfig.data,
+        heziRequireInviteCode: true,
+      },
+    },
+  });
+
+  expect(screen.getByTestId('inviteCode')).toBeInTheDocument();
 });
 
 // test('calls registerUser.mutate on registration', async () => {

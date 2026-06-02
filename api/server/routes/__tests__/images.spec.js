@@ -7,13 +7,16 @@ const mockDb = {
   deleteGeneration: jest.fn(),
   deleteGenerationBatch: jest.fn(),
   deleteGenerationTopic: jest.fn(),
+  countPendingGenerationsForUser: jest.fn(),
   getUserKeyValues: jest.fn(),
+  getActivePendingGeneration: jest.fn(),
   getGenerationTopic: jest.fn(),
   listGenerationBatches: jest.fn(),
   listPendingGenerationBatches: jest.fn(),
   listGenerationTopics: jest.fn(),
   markGenerationFailed: jest.fn(),
   markGenerationSucceeded: jest.fn(),
+  markStalePendingGenerationsFailed: jest.fn(),
   updateGenerationTopic: jest.fn(),
 };
 
@@ -107,6 +110,12 @@ describe('image generation routes', () => {
       asset: image,
       fileId: undefined,
     }));
+    mockDb.countPendingGenerationsForUser.mockResolvedValue(0);
+    mockDb.getActivePendingGeneration.mockImplementation(async ({ generationId }) => ({
+      _id: generationId,
+      status: 'pending',
+    }));
+    mockDb.markStalePendingGenerationsFailed.mockResolvedValue({ modifiedCount: 0 });
     mockDb.getGenerationTopic.mockResolvedValue({ _id: '507f1f77bcf86cd799439011' });
   });
 
@@ -185,6 +194,46 @@ describe('image generation routes', () => {
       asset: { url: 'https://cdn.example.com/cat.png' },
       fileId: undefined,
     });
+  });
+
+  it('rejects new image jobs when the user already has too many active generations', async () => {
+    mockDb.countPendingGenerationsForUser.mockResolvedValue(4);
+
+    const response = await request(app).post('/api/images/generate').send({
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+      imageNum: 1,
+    });
+
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({
+      error: 'IMAGE_GENERATION_BUSY',
+      message: '已有图片正在生成，请等待完成后再提交',
+    });
+    expect(mockDb.createGenerationBatchWithGenerations).not.toHaveBeenCalled();
+  });
+
+  it('does not persist provider results for generations cancelled while the job was running', async () => {
+    mockDb.createGenerationTopic.mockResolvedValue({ _id: 'topic-1', title: 'prompt' });
+    mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
+      batch: { _id: 'batch-1', prompt: 'prompt' },
+      generations: [{ _id: 'generation-1', status: 'pending' }],
+    });
+    mockImageService.runImageGeneration.mockResolvedValue([
+      { url: 'https://cdn.example.com/cancelled.png' },
+    ]);
+    mockDb.getActivePendingGeneration.mockResolvedValue(null);
+
+    const response = await request(app).post('/api/images/generate').send({
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+    });
+
+    expect(response.status).toBe(200);
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
+    expect(mockImageAssetStorage.persistGeneratedImageAsset).not.toHaveBeenCalled();
+    expect(mockDb.markGenerationSucceeded).not.toHaveBeenCalled();
   });
 
   it('returns pending generations before upstream image generation finishes', async () => {
@@ -297,7 +346,32 @@ describe('image generation routes', () => {
     expect(mockDb.markGenerationFailed).toHaveBeenCalledWith({
       userId: 'user-123',
       generationId: 'generation-1',
-      error: 'upstream timeout',
+      error: '生成超时，请稍后重试',
+    });
+  });
+
+  it('maps upstream overload failures to user-friendly retry messages', async () => {
+    mockDb.createGenerationBatchWithGenerations.mockResolvedValue({
+      batch: { _id: 'batch-1', prompt: 'prompt' },
+      generations: [{ _id: 'generation-1', status: 'pending' }],
+    });
+    mockImageService.runImageGeneration.mockRejectedValue(
+      new Error('system cpu overloaded (current: 100.0%, threshold: 90%)'),
+    );
+
+    const response = await request(app).post('/api/images/generate').send({
+      topicId: '507f1f77bcf86cd799439011',
+      model: 'gpt-image-2',
+      prompt: 'prompt',
+    });
+
+    expect(response.status).toBe(200);
+    await flushBackgroundJobs();
+    await flushBackgroundJobs();
+    expect(mockDb.markGenerationFailed).toHaveBeenCalledWith({
+      userId: 'user-123',
+      generationId: 'generation-1',
+      error: '服务器正在处理其他图片，请稍后重试',
     });
   });
 
@@ -464,6 +538,11 @@ describe('image generation routes', () => {
     await flushBackgroundJobs();
     await flushBackgroundJobs();
 
+    expect(mockDb.markStalePendingGenerationsFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: '生成任务超时，请重试',
+      }),
+    );
     expect(mockDb.listPendingGenerationBatches).toHaveBeenCalledWith({ limit: 25 });
     expect(mockImageService.runImageGeneration).toHaveBeenCalledWith(
       expect.objectContaining({
