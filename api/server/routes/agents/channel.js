@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('node:crypto');
+const https = require('node:https');
 const mongoose = require('mongoose');
 const { decryptV2, encryptV2, logger } = require('@librechat/data-schemas');
 const db = require('~/models');
@@ -18,6 +19,9 @@ const WECHAT_MESSAGE_STATE = {
 };
 const WECHAT_ITEM_TYPE = {
   TEXT: 1,
+};
+const WECHAT_QRCODE_STATUS_WAIT = {
+  status: 'wait',
 };
 const WECHAT_DEFAULT_SETTINGS = {
   characterLimit: 2000,
@@ -75,19 +79,53 @@ function getWechatIlinkBaseUrl() {
 }
 
 async function fetchWechatJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'iLink-App-ClientVersion': '1',
-      ...(options.headers || {}),
-    },
-    signal: AbortSignal.timeout(WECHAT_REQUEST_TIMEOUT_MS),
+  const target = new URL(url);
+  const headers = {
+    Accept: '*/*',
+    'User-Agent': `HeZi-LibreAI/${CHANNEL_VERSION}`,
+    'iLink-App-ClientVersion': '1',
+    ...(options.headers || {}),
+  };
+
+  const { text, statusCode } = await new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        family: 4,
+        headers,
+        hostname: target.hostname,
+        method: options.method || 'GET',
+        path: `${target.pathname}${target.search}`,
+        port: target.port || 443,
+        protocol: target.protocol,
+        timeout: WECHAT_REQUEST_TIMEOUT_MS,
+      },
+      (response) => {
+        let responseText = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          responseText += chunk;
+        });
+        response.on('end', () => {
+          resolve({ statusCode: response.statusCode || 0, text: responseText });
+        });
+      },
+    );
+
+    request.on('timeout', () => {
+      request.destroy(new Error('WeChat iLink request timed out'));
+    });
+    request.on('error', reject);
+
+    if (options.body) {
+      request.write(options.body);
+    }
+    request.end();
   });
-  const text = await response.text();
+
   const payload = text ? JSON.parse(text) : {};
 
-  if (!response.ok) {
-    const message = payload?.errmsg || `${response.status} ${text}`;
+  if (statusCode < 200 || statusCode >= 300) {
+    const message = payload?.errmsg || `${statusCode} ${text}`;
     throw new Error(message);
   }
 
@@ -558,6 +596,9 @@ router.get('/wechat/qrcode/:qrcode/status', async (req, res, next) => {
     );
     return res.json(payload);
   } catch (error) {
+    if (error instanceof Error && error.message === 'WeChat iLink request timed out') {
+      return res.json(WECHAT_QRCODE_STATUS_WAIT);
+    }
     return next(error);
   }
 });

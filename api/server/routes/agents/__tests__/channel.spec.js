@@ -1,10 +1,16 @@
 const express = require('express');
+const { EventEmitter } = require('node:events');
 const request = require('supertest');
 
 const mockGetAgent = jest.fn();
+const mockHttpsRequest = jest.fn();
 
 jest.mock('~/models', () => ({
   getAgent: (...args) => mockGetAgent(...args),
+}));
+
+jest.mock('node:https', () => ({
+  request: (...args) => mockHttpsRequest(...args),
 }));
 
 describe('agent channel routes', () => {
@@ -13,6 +19,36 @@ describe('agent channel routes', () => {
 
   beforeEach(() => {
     jest.useRealTimers();
+    mockHttpsRequest.mockImplementation((options, callback) => {
+      const requestEmitter = new EventEmitter();
+      requestEmitter.write = jest.fn();
+      requestEmitter.destroy = jest.fn((error) => requestEmitter.emit('error', error));
+      requestEmitter.end = jest.fn(() => {
+        process.nextTick(() => {
+          const response = new EventEmitter();
+          response.statusCode = 200;
+          response.setEncoding = jest.fn();
+          callback(response);
+
+          const payload = String(options.path).includes('/get_bot_qrcode')
+            ? {
+                qrcode: 'qr-real-123',
+                qrcode_img_content: 'https://ilinkai.weixin.qq.com/qrcode/qr-real-123',
+              }
+            : {
+                bot_token: 'bot-token-123',
+                ilink_bot_id: 'bot-id-123',
+                ilink_user_id: 'user-id-123',
+                status: 'confirmed',
+              };
+
+          response.emit('data', JSON.stringify(payload));
+          response.emit('end');
+        });
+      });
+
+      return requestEmitter;
+    });
     global.fetch = jest.fn(async (url) => {
       if (String(url).includes('/get_bot_qrcode')) {
         return {
@@ -71,19 +107,52 @@ describe('agent channel routes', () => {
       ilink_user_id: 'user-id-123',
       status: 'confirmed',
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3',
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        headers: { 'iLink-App-ClientVersion': '1' },
+        family: 4,
+        headers: expect.objectContaining({ 'iLink-App-ClientVersion': '1' }),
+        hostname: 'ilinkai.weixin.qq.com',
         method: 'GET',
+        path: '/ilink/bot/get_bot_qrcode?bot_type=3',
       }),
+      expect.any(Function),
     );
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=qr-real-123',
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        headers: { 'iLink-App-ClientVersion': '1' },
+        family: 4,
+        headers: expect.objectContaining({ 'iLink-App-ClientVersion': '1' }),
+        hostname: 'ilinkai.weixin.qq.com',
         method: 'GET',
+        path: '/ilink/bot/get_qrcode_status?qrcode=qr-real-123',
       }),
+      expect.any(Function),
+    );
+  });
+
+  it('keeps WeChat QR polling in wait state when iLink status times out', async () => {
+    mockHttpsRequest.mockImplementationOnce((_options, _callback) => {
+      const requestEmitter = new EventEmitter();
+      requestEmitter.write = jest.fn();
+      requestEmitter.destroy = jest.fn((error) => requestEmitter.emit('error', error));
+      requestEmitter.end = jest.fn(() => {
+        process.nextTick(() => {
+          requestEmitter.emit('timeout');
+        });
+      });
+      return requestEmitter;
+    });
+
+    const response = await request(app)
+      .get('/api/agents/channel/wechat/qrcode/pending-qr/status')
+      .expect(200);
+
+    expect(response.body).toEqual({ status: 'wait' });
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        family: 4,
+        path: '/ilink/bot/get_qrcode_status?qrcode=pending-qr',
+      }),
+      expect.any(Function),
     );
   });
 
