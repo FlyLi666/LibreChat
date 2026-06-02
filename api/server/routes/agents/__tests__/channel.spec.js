@@ -73,7 +73,10 @@ describe('agent channel routes', () => {
     });
     expect(global.fetch).toHaveBeenCalledWith(
       'https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3',
-      expect.objectContaining({ method: 'GET' }),
+      expect.objectContaining({
+        headers: { 'iLink-App-ClientVersion': '1' },
+        method: 'GET',
+      }),
     );
     expect(global.fetch).toHaveBeenCalledWith(
       'https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=qr-real-123',

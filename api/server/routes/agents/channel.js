@@ -77,6 +77,10 @@ function getWechatIlinkBaseUrl() {
 async function fetchWechatJson(url, options = {}) {
   const response = await fetch(url, {
     ...options,
+    headers: {
+      'iLink-App-ClientVersion': '1',
+      ...(options.headers || {}),
+    },
     signal: AbortSignal.timeout(WECHAT_REQUEST_TIMEOUT_MS),
   });
   const text = await response.text();
