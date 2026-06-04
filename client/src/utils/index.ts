@@ -26,6 +26,7 @@ export * from './conversation';
 export * from './endpoints';
 export * from './resources';
 export * from './downloadFile';
+export * from './documentTitle';
 export * from './scaleImage';
 export * from './timestamps';
 export * from './localStorage';

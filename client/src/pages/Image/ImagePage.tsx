@@ -8,7 +8,6 @@ import {
   ImageIcon,
   ImagePlus,
   LayoutGrid,
-  Lightbulb,
   ListIcon,
   Maximize2,
   Pencil,
@@ -992,14 +991,6 @@ function PromptComposer({
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-10 rounded-xl text-text-tertiary"
-            aria-label={localize('com_image_action_optimize_prompt')}
-          >
-            <Lightbulb className="h-4 w-4" />
-          </Button>
           <Button
             size="icon"
             className="size-10 rounded-xl"

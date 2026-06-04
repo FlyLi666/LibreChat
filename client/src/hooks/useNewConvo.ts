@@ -33,6 +33,7 @@ import {
   buildDefaultConvo,
   logger,
   getConversationRoutePath,
+  setDocumentTitle,
 } from '~/utils';
 import { useDeleteFilesMutation, useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import useAssistantListMap from './Assistants/useAssistantListMap';
@@ -247,10 +248,7 @@ const useNewConvo = (index = 0) => {
         const getParams = () => (searchParamsString ? `?${searchParamsString}` : '');
 
         if (conversation.conversationId === Constants.NEW_CONVO && !modelsData) {
-          const appTitle = localStorage.getItem(LocalStorageKeys.APP_TITLE) ?? '';
-          if (appTitle) {
-            document.title = appTitle;
-          }
+          setDocumentTitle();
           const path = getConversationRoutePath({
             pathname: location.pathname,
             conversationId: Constants.NEW_CONVO,

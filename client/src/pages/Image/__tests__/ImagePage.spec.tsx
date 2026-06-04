@@ -416,6 +416,12 @@ describe('ImagePage', () => {
     expect(screen.queryByLabelText('参考图')).not.toBeInTheDocument();
   });
 
+  it('does not expose the prompt optimize action until a real optimizer is connected', () => {
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: '提示优化' })).not.toBeInTheDocument();
+  });
+
   it('submits prompt, model, params, and image count', async () => {
     renderPage();
 

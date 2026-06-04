@@ -1,11 +1,12 @@
 // useDocumentTitle.js
 import { useEffect } from 'react';
+import { setDocumentTitle } from '~/utils';
 
 // function useDocumentTitle(title, prevailOnUnmount = false) {
 // const defaultTitle = useRef(document.title);
 function useDocumentTitle(title: string) {
   useEffect(() => {
-    document.title = title;
+    setDocumentTitle(title);
   }, [title]);
 
   // useEffect(

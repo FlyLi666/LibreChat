@@ -18,6 +18,8 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   const accountSettingsButtonRef = useRef<HTMLButtonElement>(null);
+  const helpAndFaqURL = startupConfig?.helpAndFaqURL;
+  const canOpenHelp = !!helpAndFaqURL && helpAndFaqURL !== '/';
 
   return (
     <Menu.MenuProvider>
@@ -73,9 +75,9 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
           <FileText className="icon-md" aria-hidden="true" />
           {localize('com_nav_my_files')}
         </Menu.MenuItem>
-        {startupConfig?.helpAndFaqURL !== '/' && (
+        {canOpenHelp && (
           <Menu.MenuItem
-            onClick={() => window.open(startupConfig?.helpAndFaqURL, '_blank')}
+            onClick={() => window.open(helpAndFaqURL, '_blank', 'noopener,noreferrer')}
             className="select-item text-sm"
           >
             <LinkIcon aria-hidden="true" />

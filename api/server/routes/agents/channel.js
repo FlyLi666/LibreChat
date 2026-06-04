@@ -179,6 +179,23 @@ function normalizeWechatSettings(settings = {}) {
   };
 }
 
+function buildWechatConnectUpdate({ agentId, credentials, encryptedCredentials, settings, user }) {
+  return {
+    $set: {
+      agentId,
+      applicationId: credentials.botId,
+      connectedAt: new Date(),
+      credentials: encryptedCredentials,
+      enabled: true,
+      platform: 'wechat',
+      runtimeStatus: 'connecting',
+      settings: normalizeWechatSettings(settings),
+      user,
+    },
+    $unset: { lastError: '' },
+  };
+}
+
 function isVirtualLobeAgentId(agentId) {
   return VIRTUAL_LOBE_AGENT_IDS.has(agentId) || LOBE_STYLE_AGENT_ID_PATTERN.test(agentId);
 }
@@ -234,23 +251,62 @@ function buildWechatBotHeaders(botToken) {
     Authorization: `Bearer ${botToken}`,
     AuthorizationType: 'ilink_bot_token',
     'Content-Type': 'application/json',
+    'iLink-App-ClientVersion': '1',
     'X-WECHAT-UIN': randomUin(),
   };
 }
 
 async function fetchWechatBotJson(path, credentials, options = {}) {
-  const response = await fetch(`${credentials.baseurl || getWechatIlinkBaseUrl()}${path}`, {
-    ...options,
-    headers: {
-      ...buildWechatBotHeaders(credentials.botToken),
-      ...(options.headers || {}),
-    },
+  const target = new URL(`${credentials.baseurl || getWechatIlinkBaseUrl()}${path}`);
+  const headers = {
+    ...buildWechatBotHeaders(credentials.botToken),
+    ...(options.headers || {}),
+  };
+  const body = options.body || '';
+  if (body) {
+    headers['Content-Length'] = Buffer.byteLength(body);
+  }
+  const requestTimeout = options.signal ? WECHAT_POLL_TIMEOUT_MS + 5000 : WECHAT_REQUEST_TIMEOUT_MS;
+
+  const { text, statusCode } = await new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        family: 4,
+        headers,
+        hostname: target.hostname,
+        method: options.method || 'GET',
+        path: `${target.pathname}${target.search}`,
+        port: target.port || 443,
+        protocol: target.protocol,
+        signal: options.signal,
+        timeout: requestTimeout,
+      },
+      (response) => {
+        let responseText = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          responseText += chunk;
+        });
+        response.on('end', () => {
+          resolve({ statusCode: response.statusCode || 0, text: responseText });
+        });
+      },
+    );
+
+    request.on('timeout', () => {
+      request.destroy(new Error('WeChat iLink request timed out'));
+    });
+    request.on('error', reject);
+
+    if (body) {
+      request.write(body);
+    }
+    request.end();
   });
-  const text = await response.text();
   const payload = text ? JSON.parse(text) : {};
 
-  if (!response.ok) {
-    throw new Error(payload?.errmsg || `${response.status} ${text}`);
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(payload?.errmsg || `${statusCode} ${text}`);
   }
 
   const ret = payload?.ret;
@@ -264,7 +320,19 @@ async function fetchWechatBotJson(path, credentials, options = {}) {
 }
 
 async function updateProviderRuntime(providerId, value) {
-  await AgentChannelProvider.updateOne({ _id: providerId }, { $set: value });
+  const $set = {};
+  const $unset = {};
+  for (const [key, fieldValue] of Object.entries(value)) {
+    if (fieldValue === undefined) {
+      $unset[key] = '';
+    } else {
+      $set[key] = fieldValue;
+    }
+  }
+  const update = {};
+  if (Object.keys($set).length > 0) update.$set = $set;
+  if (Object.keys($unset).length > 0) update.$unset = $unset;
+  await AgentChannelProvider.updateOne({ _id: providerId }, update);
 }
 
 async function drainWechatBacklog(providerId, cursor) {
@@ -273,10 +341,10 @@ async function drainWechatBacklog(providerId, cursor) {
     {
       $set: {
         cursor,
-        lastError: undefined,
         runtimeStatus: 'connected',
         'settings.skipNextWechatBacklog': false,
       },
+      $unset: { lastError: '' },
     },
   );
 }
@@ -649,20 +717,13 @@ router.post('/:agentId/wechat/connect', async (req, res, next) => {
     const encryptedCredentials = await encryptCredentials(credentials);
     const provider = await AgentChannelProvider.findOneAndUpdate(
       { agentId: resolved.agentId, platform: 'wechat', user },
-      {
-        $set: {
-          agentId: resolved.agentId,
-          applicationId: credentials.botId,
-          connectedAt: new Date(),
-          credentials: encryptedCredentials,
-          enabled: true,
-          lastError: undefined,
-          platform: 'wechat',
-          runtimeStatus: 'connecting',
-          settings: normalizeWechatSettings(req.body.settings),
-          user,
-        },
-      },
+      buildWechatConnectUpdate({
+        agentId: resolved.agentId,
+        credentials,
+        encryptedCredentials,
+        settings: req.body.settings,
+        user,
+      }),
       { new: true, upsert: true },
     );
 
@@ -670,6 +731,7 @@ router.post('/:agentId/wechat/connect', async (req, res, next) => {
 
     return res.json({
       ...summarizeProvider(provider),
+      lastError: undefined,
       runtimeStatus: 'connecting',
     });
   } catch (error) {
@@ -767,8 +829,10 @@ module.exports = router;
 
 router._internals = {
   AgentChannelProvider,
+  buildWechatConnectUpdate,
   drainWechatBacklog,
   extractWechatMessageText,
+  fetchWechatBotJson,
   getWechatContextToken,
   getWechatMessageSender,
   getWechatMessageKey,
@@ -779,6 +843,7 @@ router._internals = {
   resolveChannelAgent,
   scheduleWechatRuntimeRestore,
   sendWechatText,
+  updateProviderRuntime,
 };
 
 scheduleWechatRuntimeRestore();

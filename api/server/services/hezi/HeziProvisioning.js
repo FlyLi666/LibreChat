@@ -42,6 +42,7 @@ const {
 
 const PLUGIN_KEY = 'newapi-shadow';
 const HEZI_ENDPOINT_NAME = 'HeZi newAPI';
+const PROFILE_FIELD_LIMIT = 240;
 
 async function storeShadow(userId, fields) {
   for (const [authField, value] of Object.entries(fields)) {
@@ -62,6 +63,43 @@ function getNewapiV1BaseUrl() {
 
 function getShadowUsername(userId) {
   return `hezi_${String(userId).slice(-12)}`;
+}
+
+function cleanProfilePart(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function limitProfileField(value, limit = PROFILE_FIELD_LIMIT) {
+  const cleaned = cleanProfilePart(value);
+  if (cleaned.length <= limit) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, Math.max(0, limit - 1))}...`;
+}
+
+function buildShadowProfile(user, shadowUsername) {
+  const userId = String(user?._id || '');
+  const heziUsername = cleanProfilePart(user?.username);
+  const heziName = cleanProfilePart(user?.name);
+  const email = cleanProfilePart(user?.email);
+  const displayName = limitProfileField(heziUsername || heziName || email || shadowUsername, 64);
+  const remarkParts = [
+    ['HeZi userId', userId],
+    ['email', email],
+    ['username', heziUsername],
+    ['name', heziName],
+    ['shadow', shadowUsername],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`);
+
+  return {
+    displayName,
+    remark: limitProfileField(remarkParts.join(' | ')),
+  };
 }
 
 async function storeEndpointKey(userId, sk) {
@@ -90,12 +128,17 @@ async function provisionShadowAccount({ user, quotaCode }) {
   }
   const userId = String(user._id);
   const username = getShadowUsername(userId); // <= 17 chars; NewAPI accepts
-  const displayName = username;
+  const profile = buildShadowProfile(user, username);
   const password = generateShadowPassword();
 
   // 1+2. Create shadow user (ignore "already exists" — recover by lookup)
   try {
-    await createShadowUser({ username, password, displayName });
+    await createShadowUser({
+      username,
+      password,
+      displayName: profile.displayName,
+      remark: profile.remark,
+    });
   } catch (err) {
     if (err instanceof NewapiError && /exist|duplicate/i.test(JSON.stringify(err.body || ''))) {
       logger.warn(`[HeziProvisioning] shadow user ${username} already exists, attempting recovery`);
@@ -294,4 +337,6 @@ module.exports = {
   rollbackShadowAccount,
   PLUGIN_KEY,
   HEZI_ENDPOINT_NAME,
+  buildShadowProfile,
+  getShadowUsername,
 };

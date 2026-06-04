@@ -97,15 +97,28 @@ async function readJsonOrText(res) {
  * POST /api/user/  — admin creates a user.
  * NewAPI returns `{ success: true, message: '', data: ... }` on success.
  */
-async function createShadowUser({ username, password, displayName }) {
+function assignIfPresent(target, key, value) {
+  if (typeof value !== 'string') {
+    return;
+  }
+  const trimmed = value.trim();
+  if (trimmed) {
+    target[key] = trimmed;
+  }
+}
+
+async function createShadowUser({ username, password, displayName, remark }) {
+  const payload = {
+    username,
+    password,
+  };
+  assignIfPresent(payload, 'display_name', displayName);
+  assignIfPresent(payload, 'remark', remark);
+
   const res = await newapiFetch(`${BASE}/api/user/`, {
     method: 'POST',
     headers: adminHeaders(),
-    body: JSON.stringify({
-      username,
-      password,
-      display_name: displayName,
-    }),
+    body: JSON.stringify(payload),
   });
   const { body, raw } = await readJsonOrText(res);
   if (!res.ok || !body?.success) {
@@ -113,6 +126,45 @@ async function createShadowUser({ username, password, displayName }) {
       status: res.status,
       body: body || raw,
       code: 'CREATE_USER_FAILED',
+    });
+  }
+  return body;
+}
+
+/**
+ * PUT /api/user/ — admin updates a user.
+ * NewAPI expects the numeric user id in the request body.
+ */
+async function updateShadowUserProfile({ id, username, group, status, role, displayName, remark }) {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) {
+    throw new NewapiError(`updateShadowUserProfile invalid id: ${id}`, {
+      code: 'UPDATE_USER_INVALID_ID',
+    });
+  }
+  const payload = { id: numericId };
+  assignIfPresent(payload, 'username', username);
+  assignIfPresent(payload, 'group', group);
+  assignIfPresent(payload, 'display_name', displayName);
+  assignIfPresent(payload, 'remark', remark);
+  if (Number.isFinite(Number(status))) {
+    payload.status = Number(status);
+  }
+  if (Number.isFinite(Number(role))) {
+    payload.role = Number(role);
+  }
+
+  const res = await newapiFetch(`${BASE}/api/user/`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const { body, raw } = await readJsonOrText(res);
+  if (!res.ok || !body?.success) {
+    throw new NewapiError(`updateShadowUserProfile failed: ${body?.message || raw || res.status}`, {
+      status: res.status,
+      body: body || raw,
+      code: 'UPDATE_USER_FAILED',
     });
   }
   return body;
@@ -389,6 +441,7 @@ module.exports = {
   NewapiError,
   generateShadowPassword,
   createShadowUser,
+  updateShadowUserProfile,
   findShadowUserByUsername,
   loginAsUser,
   createUserToken,

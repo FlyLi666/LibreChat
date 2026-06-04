@@ -19,6 +19,7 @@ import { ActivePanelProvider, DEFAULT_PANEL } from '~/Providers/ActivePanelConte
 
 const mockNewConversation = jest.fn();
 const mockClearMessagesCache = jest.fn();
+let mockHelpAndFaqURL = 'https://help.hezi.test/docs';
 
 jest.mock('~/store', () => {
   const { atom } = jest.requireActual('recoil');
@@ -40,6 +41,10 @@ jest.mock('~/store', () => {
 jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) => key,
   useNewConvo: () => ({ newConversation: mockNewConversation }),
+}));
+
+jest.mock('~/data-provider', () => ({
+  useGetStartupConfig: () => ({ data: { helpAndFaqURL: mockHelpAndFaqURL } }),
 }));
 
 jest.mock('~/utils', () => ({
@@ -161,6 +166,12 @@ describe('ExpandedPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    mockHelpAndFaqURL = 'https://help.hezi.test/docs';
+    jest.spyOn(window, 'open').mockImplementation(() => null);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('NavIconButton collapse toggle', () => {
@@ -267,6 +278,29 @@ describe('ExpandedPanel', () => {
 
       expect(buttons).toEqual(expect.arrayContaining(['com_nav_image_gen', 'com_ui_prompts']));
       expect(buttons.indexOf('com_nav_image_gen')).toBeLessThan(buttons.indexOf('com_ui_prompts'));
+    });
+
+    it('opens the configured help page from the bottom rail help button', () => {
+      renderPanel({ expanded: true });
+
+      fireEvent.click(screen.getByRole('button', { name: 'com_nav_help_faq' }));
+
+      expect(window.open).toHaveBeenCalledWith(
+        'https://help.hezi.test/docs',
+        '_blank',
+        'noopener,noreferrer',
+      );
+    });
+
+    it('disables the bottom rail help button when no help page is configured', () => {
+      mockHelpAndFaqURL = '/';
+      renderPanel({ expanded: true });
+
+      const helpButton = screen.getByRole('button', { name: 'com_nav_help_faq' });
+      fireEvent.click(helpButton);
+
+      expect(helpButton).toBeDisabled();
+      expect(window.open).not.toHaveBeenCalled();
     });
   });
 
