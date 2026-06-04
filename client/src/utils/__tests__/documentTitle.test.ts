@@ -1,5 +1,5 @@
 import { LocalStorageKeys } from 'librechat-data-provider';
-import { getAppTitle, setDocumentTitle } from '../documentTitle';
+import { getAppTitle, normalizeDocumentTitle, setDocumentTitle } from '../documentTitle';
 
 describe('documentTitle utilities', () => {
   beforeEach(() => {
@@ -28,5 +28,19 @@ describe('documentTitle utilities', () => {
     setDocumentTitle('Research notes');
 
     expect(document.title).toBe('Research notes');
+  });
+
+  it('rebrands legacy LibreChat title suffixes', () => {
+    localStorage.setItem(LocalStorageKeys.APP_TITLE, 'HeZi');
+
+    setDocumentTitle('Agent Marketplace | LibreChat');
+
+    expect(document.title).toBe('Agent Marketplace | HeZi');
+  });
+
+  it('does not rewrite LibreChat mentions inside regular titles', () => {
+    expect(normalizeDocumentTitle('Terms of Service for LibreChat', 'HeZi')).toBe(
+      'Terms of Service for LibreChat',
+    );
   });
 });

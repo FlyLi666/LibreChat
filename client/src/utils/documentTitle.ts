@@ -16,5 +16,19 @@ export function setDocumentTitle(title?: string | null) {
   }
 
   const normalizedTitle = title?.trim();
-  document.title = normalizedTitle || getAppTitle();
+  const appTitle = getAppTitle();
+  document.title = normalizeDocumentTitle(normalizedTitle, appTitle);
+}
+
+export function normalizeDocumentTitle(title?: string | null, appTitle = DEFAULT_APP_TITLE) {
+  const normalizedTitle = title?.trim();
+  if (!normalizedTitle) {
+    return appTitle;
+  }
+
+  if (normalizedTitle === 'LibreChat') {
+    return appTitle;
+  }
+
+  return normalizedTitle.replace(/\s+\|\s+LibreChat$/, ` | ${appTitle}`);
 }

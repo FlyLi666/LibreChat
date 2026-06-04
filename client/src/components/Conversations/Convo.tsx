@@ -11,7 +11,7 @@ import { useGetEndpointsQuery } from '~/data-provider';
 import { NotificationSeverity } from '~/common';
 import { ConvoOptions } from './ConvoOptions';
 import RenameForm from './RenameForm';
-import { cn, logger } from '~/utils';
+import { cn, logger, setDocumentTitle } from '~/utils';
 import ConvoLink from './ConvoLink';
 import store from '~/store';
 
@@ -157,7 +157,7 @@ export default function Conversation({
     toggleNav();
 
     if (typeof title === 'string' && title.length > 0) {
-      document.title = title;
+      setDocumentTitle(title);
     }
 
     navigateToConvo(conversation, {
