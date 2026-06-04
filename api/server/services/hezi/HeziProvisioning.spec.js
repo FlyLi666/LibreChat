@@ -64,9 +64,11 @@ describe('HeziProvisioning', () => {
     process.env.HEZI_NEWAPI_BASE_URL = 'https://newapi.flyli.cn';
   });
 
-  test('uses a short NewAPI display name even when the LibreChat email is long', async () => {
+  test('labels the NewAPI shadow user with the HeZi registered username', async () => {
     const user = {
       _id: { toString: () => '66554433221100ffeeddccbb' },
+      username: 'teacher',
+      name: 'Teacher Zhang',
       email: 'very.long.integration.smoke.address.for.hezi@example.flyli.cn',
     };
 
@@ -75,8 +77,28 @@ describe('HeziProvisioning', () => {
     expect(createShadowUser).toHaveBeenCalledWith({
       username: 'hezi_00ffeeddccbb',
       password: 'Password2345678',
-      displayName: 'hezi_00ffeeddccbb',
+      displayName: 'teacher',
+      remark:
+        'HeZi userId: 66554433221100ffeeddccbb | email: very.long.integration.smoke.address.for.hezi@example.flyli.cn | username: teacher | name: Teacher Zhang | shadow: hezi_00ffeeddccbb',
     });
+  });
+
+  test('falls back to the HeZi name when username is empty', async () => {
+    const user = {
+      _id: { toString: () => '66554433221100ffeeddccbb' },
+      username: '',
+      name: 'Display Name',
+      email: 'teacher@example.flyli.cn',
+    };
+
+    await provisionShadowAccount({ user });
+
+    expect(createShadowUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        displayName: 'Display Name',
+        remark: expect.stringContaining('name: Display Name'),
+      }),
+    );
   });
 
   test('stores the shadow token as the user key for the HeZi custom endpoint', async () => {

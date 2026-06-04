@@ -129,7 +129,8 @@ describe('NewapiClient', () => {
     await createShadowUser({
       username: 'hezi_00ffeeddccbb',
       password: 'Password2345678',
-      displayName: 'hezi_00ffeeddccbb',
+      displayName: 'teacher',
+      remark: 'HeZi userId: 66554433221100ffeeddccbb',
     });
 
     expect(abortTimeoutSpy).toHaveBeenCalledWith(1234);
@@ -139,6 +140,44 @@ describe('NewapiClient', () => {
       }),
     );
     abortTimeoutSpy.mockRestore();
+  });
+
+  test('updates a NewAPI shadow user profile without changing credentials', async () => {
+    process.env.HEZI_NEWAPI_ADMIN_TOKEN = 'admin-token';
+    process.env.HEZI_NEWAPI_ADMIN_USER_ID = '1';
+    mockFetch.mockResolvedValue(jsonResponse({ success: true, message: '' }));
+    const { updateShadowUserProfile } = require('./NewapiClient');
+
+    await updateShadowUserProfile({
+      id: 41,
+      username: 'hezi_ba9684c86492',
+      group: 'default',
+      status: 1,
+      role: 1,
+      displayName: '111',
+      remark: 'HeZi userId: 6a1e98dc3835ba9684c86492 | email: user@example.com',
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://newapi.test/api/user/',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({
+          Authorization: 'admin-token',
+          'New-Api-User': '1',
+        }),
+        body: JSON.stringify({
+          id: 41,
+          username: 'hezi_ba9684c86492',
+          group: 'default',
+          display_name: '111',
+          remark: 'HeZi userId: 6a1e98dc3835ba9684c86492 | email: user@example.com',
+          status: 1,
+          role: 1,
+        }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
   });
 
   test('creates one NewAPI redemption code per invite', async () => {
