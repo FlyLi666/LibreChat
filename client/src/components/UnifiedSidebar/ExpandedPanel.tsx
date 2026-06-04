@@ -8,6 +8,7 @@ import { Skeleton, Sidebar, Button, TooltipAnchor, ThemeContext } from '@librech
 import type { NavLink } from '~/common';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import { useActivePanel, resolveActivePanel, DEFAULT_PANEL } from '~/Providers';
+import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize, useNewConvo } from '~/hooks';
 import { clearMessagesCache, cn } from '~/utils';
 import store from '~/store';
@@ -275,11 +276,20 @@ function ExpandedPanel({
 }) {
   const localize = useLocalize();
   const { active, setActive } = useActivePanel();
+  const { data: startupConfig } = useGetStartupConfig();
   const location = useLocation();
   const resolvedAssistantLinks = assistantLinks.length > 0 ? assistantLinks : primaryLinks;
   const conversationsLink = links.find((link) => link.id === DEFAULT_PANEL) ?? links[0];
   const activePanelId = resolveActivePanel(active, links);
   const secondaryLinks = links.filter((link) => link.id !== DEFAULT_PANEL);
+  const helpAndFaqURL = startupConfig?.helpAndFaqURL;
+  const canOpenHelp = !!helpAndFaqURL && helpAndFaqURL !== '/';
+  const openHelpAndFaq = useCallback(() => {
+    if (!canOpenHelp) {
+      return;
+    }
+    window.open(helpAndFaqURL, '_blank', 'noopener,noreferrer');
+  }, [canOpenHelp, helpAndFaqURL]);
   const routeActive = (() => {
     if (location.pathname === '/image') {
       return 'image';
@@ -475,8 +485,11 @@ function ExpandedPanel({
               size="icon"
               variant="ghost"
               aria-label={localize('com_nav_help_faq')}
+              disabled={!canOpenHelp}
+              onClick={openHelpAndFaq}
               className={cn(
                 'h-9 rounded-lg text-text-secondary hover:bg-surface-hover hover:text-text-primary',
+                !canOpenHelp && 'cursor-not-allowed opacity-50 hover:bg-transparent',
                 expanded ? 'w-full justify-start gap-2 px-2 text-sm' : 'w-9',
               )}
             >
