@@ -86,6 +86,8 @@ const DEFAULT_WECHAT_SETTINGS: WechatSettings = {
   showToolCalls: false,
   showUsage: false,
 };
+const WECHAT_RECONNECT_POLL_ATTEMPTS = 5;
+const WECHAT_RECONNECT_POLL_DELAY_MS = 2000;
 
 const channelConfigs: ChannelConfig[] = [
   {
@@ -414,6 +416,7 @@ export default function AgentChannelsPage({
 }) {
   const localize = useLocalize();
   const wechatPollTimer = useRef<number | null>(null);
+  const wechatProviderRefreshTimer = useRef<number | null>(null);
   const channelAgentId = agentContext?.resolvedAgentId ?? (agentId.trim() ? agentId.trim() : '');
   const [selectedId, setSelectedId] = useState<ChannelConfig['id']>('wechat');
   const [values, setValues] = useState(buildInitialValues);
@@ -512,6 +515,44 @@ export default function AgentChannelsPage({
     }
   };
 
+  const clearWechatProviderRefreshTimer = () => {
+    if (wechatProviderRefreshTimer.current) {
+      window.clearTimeout(wechatProviderRefreshTimer.current);
+      wechatProviderRefreshTimer.current = null;
+    }
+  };
+
+  const refreshWechatProviderUntilSettled = (attempt = 1) => {
+    clearWechatProviderRefreshTimer();
+    if (!channelAgentId) return;
+
+    wechatProviderRefreshTimer.current = window.setTimeout(async () => {
+      try {
+        const provider = await requestWechatProvider(channelAgentId);
+        if (provider) {
+          setWechatProvider(provider);
+          if (provider.runtimeStatus !== 'connecting') {
+            setWechatActionError('');
+            return;
+          }
+        }
+      } catch (error) {
+        if (attempt >= WECHAT_RECONNECT_POLL_ATTEMPTS) {
+          setWechatActionError(
+            error instanceof Error
+              ? error.message
+              : localize('com_agent_channel_wechat_start_error'),
+          );
+          return;
+        }
+      }
+
+      if (attempt < WECHAT_RECONNECT_POLL_ATTEMPTS) {
+        refreshWechatProviderUntilSettled(attempt + 1);
+      }
+    }, WECHAT_RECONNECT_POLL_DELAY_MS);
+  };
+
   const scheduleWechatPoll = (qrcode: string) => {
     clearWechatPollTimer();
     wechatPollTimer.current = window.setTimeout(async () => {
@@ -606,6 +647,9 @@ export default function AgentChannelsPage({
     try {
       const provider = await requestWechatStart(channelAgentId);
       setWechatProvider(provider);
+      if (provider.runtimeStatus === 'connecting') {
+        refreshWechatProviderUntilSettled();
+      }
     } catch (error) {
       setWechatActionError(
         error instanceof Error ? error.message : localize('com_agent_channel_wechat_start_error'),
@@ -637,7 +681,13 @@ export default function AgentChannelsPage({
     }
   };
 
-  useEffect(() => () => clearWechatPollTimer(), []);
+  useEffect(
+    () => () => {
+      clearWechatPollTimer();
+      clearWechatProviderRefreshTimer();
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -645,6 +695,7 @@ export default function AgentChannelsPage({
       setWechatProvider(null);
       return () => {
         active = false;
+        clearWechatProviderRefreshTimer();
       };
     }
 
@@ -671,6 +722,7 @@ export default function AgentChannelsPage({
 
     return () => {
       active = false;
+      clearWechatProviderRefreshTimer();
     };
   }, [channelAgentId]);
 

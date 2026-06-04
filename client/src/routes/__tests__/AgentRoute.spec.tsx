@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { setTokenHeader } from 'librechat-data-provider';
 import AgentRoute from '../AgentRoute';
@@ -506,6 +506,11 @@ describe('AgentRoute', () => {
     expect(await screen.findByText('WeChat is connected')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rebind' })).toBeInTheDocument();
 
+    jest.useFakeTimers();
+    const providerReadsBeforeReconnect = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).endsWith('/api/agents/channel/agent-real-id/wechat'),
+    ).length;
+
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
@@ -513,6 +518,18 @@ describe('AgentRoute', () => {
         expect.objectContaining({ method: 'POST' }),
       ),
     );
+    await screen.findByText('Connecting');
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      const providerReadsAfterReconnect = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith('/api/agents/channel/agent-real-id/wechat'),
+      ).length;
+      expect(providerReadsAfterReconnect).toBeGreaterThan(providerReadsBeforeReconnect);
+    });
+    jest.useRealTimers();
 
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     await waitFor(() =>

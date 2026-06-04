@@ -133,6 +133,8 @@ async function hasShadowAuth(db, userId) {
   console.error('[hezi-sync-newapi-profiles] fatal', err);
   try {
     await mongoose.disconnect();
-  } catch {}
+  } catch {
+    // Process is already failing; keep the original fatal error visible.
+  }
   process.exit(1);
 });

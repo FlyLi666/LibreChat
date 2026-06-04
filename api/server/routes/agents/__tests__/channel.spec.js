@@ -16,12 +16,16 @@ jest.mock('node:https', () => ({
 describe('agent channel routes', () => {
   let app;
   let channelRouter;
+  let httpsWrites;
 
   beforeEach(() => {
     jest.useRealTimers();
+    httpsWrites = [];
     mockHttpsRequest.mockImplementation((options, callback) => {
       const requestEmitter = new EventEmitter();
-      requestEmitter.write = jest.fn();
+      requestEmitter.write = jest.fn((chunk) => {
+        httpsWrites.push({ chunk, options });
+      });
       requestEmitter.destroy = jest.fn((error) => requestEmitter.emit('error', error));
       requestEmitter.end = jest.fn(() => {
         process.nextTick(() => {
@@ -211,11 +215,6 @@ describe('agent channel routes', () => {
   });
 
   it('sends WeChat text replies through iLink sendmessage', async () => {
-    global.fetch = jest.fn(async () => ({
-      ok: true,
-      text: async () => JSON.stringify({ ret: 0 }),
-    }));
-
     await channelRouter._internals.sendWechatText(
       { baseurl: 'https://ilink.test', botToken: 'bot-token-123' },
       'wechat-user-1@im.wechat',
@@ -223,17 +222,23 @@ describe('agent channel routes', () => {
       'ctx-123',
     );
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://ilink.test/ilink/bot/sendmessage',
+    expect(mockHttpsRequest).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        family: 4,
+        hostname: 'ilink.test',
         method: 'POST',
+        path: '/ilink/bot/sendmessage',
         headers: expect.objectContaining({
           Authorization: 'Bearer bot-token-123',
           AuthorizationType: 'ilink_bot_token',
+          'Content-Length': expect.any(Number),
+          'Content-Type': 'application/json',
+          'iLink-App-ClientVersion': '1',
         }),
       }),
+      expect.any(Function),
     );
-    const requestBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const requestBody = JSON.parse(httpsWrites.at(-1).chunk);
     expect(requestBody.msg).toEqual(
       expect.objectContaining({
         context_token: 'ctx-123',
@@ -249,13 +254,44 @@ describe('agent channel routes', () => {
     });
   });
 
+  it('polls WeChat bot updates through the IPv4 iLink request helper', async () => {
+    await channelRouter._internals.fetchWechatBotJson(
+      '/ilink/bot/getupdates',
+      { baseurl: 'https://ilink.test', botToken: 'bot-token-123' },
+      {
+        body: JSON.stringify({
+          base_info: { channel_version: '1.0.0' },
+          get_updates_buf: '',
+        }),
+        method: 'POST',
+      },
+    );
+
+    expect(mockHttpsRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        family: 4,
+        hostname: 'ilink.test',
+        method: 'POST',
+        path: '/ilink/bot/getupdates',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer bot-token-123',
+          'Content-Length': expect.any(Number),
+          'Content-Type': 'application/json',
+          'iLink-App-ClientVersion': '1',
+        }),
+      }),
+      expect.any(Function),
+    );
+    expect(JSON.parse(httpsWrites.at(-1).chunk)).toEqual(
+      expect.objectContaining({
+        get_updates_buf: '',
+      }),
+    );
+  });
+
   it('bridges inbound WeChat messages through the configured reply handler', async () => {
     const replyHandler = jest.fn(async ({ text }) => `reply: ${text}`);
     channelRouter.locals.wechatReplyHandler = replyHandler;
-    global.fetch = jest.fn(async () => ({
-      ok: true,
-      text: async () => JSON.stringify({ ret: 0 }),
-    }));
     jest.spyOn(channelRouter._internals.AgentChannelProvider, 'updateOne').mockResolvedValue({});
 
     const result = await channelRouter._internals.handleWechatInboundMessage({
@@ -284,7 +320,15 @@ describe('agent channel routes', () => {
         text: 'ping',
       }),
     );
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockHttpsRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        family: 4,
+        hostname: 'ilink.test',
+        method: 'POST',
+        path: '/ilink/bot/sendmessage',
+      }),
+      expect.any(Function),
+    );
   });
 
   it('skips inbound WeChat messages that were already processed', async () => {
@@ -332,8 +376,64 @@ describe('agent channel routes', () => {
           cursor: 'cursor-after-drain',
           'settings.skipNextWechatBacklog': false,
         }),
+        $unset: { lastError: '' },
       }),
     );
+  });
+
+  it('unsets stale WeChat runtime errors when runtime fields are cleared', async () => {
+    const updateOne = jest
+      .spyOn(channelRouter._internals.AgentChannelProvider, 'updateOne')
+      .mockResolvedValue({});
+
+    await channelRouter._internals.updateProviderRuntime('provider-runtime', {
+      connectedAt: new Date('2026-06-04T00:00:00.000Z'),
+      lastError: undefined,
+      runtimeStatus: 'connected',
+    });
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'provider-runtime' },
+      {
+        $set: {
+          connectedAt: new Date('2026-06-04T00:00:00.000Z'),
+          runtimeStatus: 'connected',
+        },
+        $unset: { lastError: '' },
+      },
+    );
+  });
+
+  it('unsets stale WeChat errors when reconnecting a provider', () => {
+    const update = channelRouter._internals.buildWechatConnectUpdate({
+      agentId: 'agent-real-id',
+      credentials: {
+        botId: 'bot-id-123',
+        botToken: 'bot-token-123',
+        userId: 'user-id-123',
+      },
+      encryptedCredentials: 'encrypted-credentials',
+      settings: { characterLimit: '3000', concurrencyMode: 'latest' },
+      user: 'user-123',
+    });
+
+    expect(update).toEqual(
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          agentId: 'agent-real-id',
+          applicationId: 'bot-id-123',
+          credentials: 'encrypted-credentials',
+          runtimeStatus: 'connecting',
+          settings: expect.objectContaining({
+            characterLimit: 3000,
+            concurrencyMode: 'latest',
+          }),
+          user: 'user-123',
+        }),
+        $unset: { lastError: '' },
+      }),
+    );
+    expect(update.$set).not.toHaveProperty('lastError');
   });
 
   it('persists WeChat thread state when the reply handler returns Agent metadata', async () => {

@@ -179,6 +179,23 @@ function normalizeWechatSettings(settings = {}) {
   };
 }
 
+function buildWechatConnectUpdate({ agentId, credentials, encryptedCredentials, settings, user }) {
+  return {
+    $set: {
+      agentId,
+      applicationId: credentials.botId,
+      connectedAt: new Date(),
+      credentials: encryptedCredentials,
+      enabled: true,
+      platform: 'wechat',
+      runtimeStatus: 'connecting',
+      settings: normalizeWechatSettings(settings),
+      user,
+    },
+    $unset: { lastError: '' },
+  };
+}
+
 function isVirtualLobeAgentId(agentId) {
   return VIRTUAL_LOBE_AGENT_IDS.has(agentId) || LOBE_STYLE_AGENT_ID_PATTERN.test(agentId);
 }
@@ -700,20 +717,13 @@ router.post('/:agentId/wechat/connect', async (req, res, next) => {
     const encryptedCredentials = await encryptCredentials(credentials);
     const provider = await AgentChannelProvider.findOneAndUpdate(
       { agentId: resolved.agentId, platform: 'wechat', user },
-      {
-        $set: {
-          agentId: resolved.agentId,
-          applicationId: credentials.botId,
-          connectedAt: new Date(),
-          credentials: encryptedCredentials,
-          enabled: true,
-          lastError: undefined,
-          platform: 'wechat',
-          runtimeStatus: 'connecting',
-          settings: normalizeWechatSettings(req.body.settings),
-          user,
-        },
-      },
+      buildWechatConnectUpdate({
+        agentId: resolved.agentId,
+        credentials,
+        encryptedCredentials,
+        settings: req.body.settings,
+        user,
+      }),
       { new: true, upsert: true },
     );
 
@@ -721,6 +731,7 @@ router.post('/:agentId/wechat/connect', async (req, res, next) => {
 
     return res.json({
       ...summarizeProvider(provider),
+      lastError: undefined,
       runtimeStatus: 'connecting',
     });
   } catch (error) {
@@ -818,8 +829,10 @@ module.exports = router;
 
 router._internals = {
   AgentChannelProvider,
+  buildWechatConnectUpdate,
   drainWechatBacklog,
   extractWechatMessageText,
+  fetchWechatBotJson,
   getWechatContextToken,
   getWechatMessageSender,
   getWechatMessageKey,
@@ -830,6 +843,7 @@ router._internals = {
   resolveChannelAgent,
   scheduleWechatRuntimeRestore,
   sendWechatText,
+  updateProviderRuntime,
 };
 
 scheduleWechatRuntimeRestore();
